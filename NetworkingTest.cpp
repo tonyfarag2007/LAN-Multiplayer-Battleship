@@ -4,7 +4,8 @@
 #include <SFML/Window/VideoMode.hpp>
 #include <SFML/Graphics.hpp>
 #include "Network.h"
-sf::RenderWindow window(sf::VideoMode({1920, 1080}), "Battleship", sf::Style::Titlebar | sf::Style::Close);
+sf::RenderWindow window(sf::VideoMode({1920, 1080}),
+    "Battleship", sf::Style::Titlebar | sf::Style::Close);
 class Ship {
 public:
     int length;
@@ -71,7 +72,8 @@ std::vector<std::vector<std::pair<int, int>>> storeShipLocations(Ship ships[], i
     }
     return shipLocations;
     }
-bool isOverlapping(std::vector<std::vector<std::pair<int, int>>> playerShipLocations, Ship ships[], int size) {
+bool isOverlapping(std::vector<std::vector<std::pair<int, int>>> playerShipLocations,
+    Ship ships[], int size) {
     for (int g = 0; g < 5; g++) {
         int shipIndex = g;
         for (int h = 0; h < 5; h++){
@@ -87,7 +89,8 @@ bool isOverlapping(std::vector<std::vector<std::pair<int, int>>> playerShipLocat
     }
     return false;
 }
-bool isHanging(std::vector<std::vector<std::pair<int, int>>> playerShipLocations, Ship ships[], int size) {
+bool isHanging(std::vector<std::vector<std::pair<int, int>>> playerShipLocations,
+    Ship ships[], int size) {
     for (int i = 0; i < 5; i++) {
         for (int j = 0; j < ships[i].length; j++) {
             if (playerShipLocations[i][j].first > 9 || playerShipLocations[i][j].first < 0
@@ -98,10 +101,11 @@ bool isHanging(std::vector<std::vector<std::pair<int, int>>> playerShipLocations
     }
     return false;
 }
-bool placeShips(Player& player, sf::RenderWindow& window) {
+bool placeShips(Player& player) {
     auto mousePosition = sf::Vector2f(sf::Mouse::getPosition(window));
     static bool wasLeftDown = false, wasRightDown = false;
-            bool leftDown = sf::Mouse::isButtonPressed(sf::Mouse::Button::Left), rightDown = sf::Mouse::isButtonPressed(sf::Mouse::Button::Right);
+            bool leftDown = sf::Mouse::isButtonPressed(sf::Mouse::Button::Left),
+    rightDown = sf::Mouse::isButtonPressed(sf::Mouse::Button::Right);
             bool leftPressedNow = leftDown && !wasLeftDown, rightPressedNow = rightDown && !wasRightDown;
             bool releasedNow = !leftDown && wasLeftDown;
             if (rightPressedNow) {
@@ -141,7 +145,8 @@ bool placeShips(Player& player, sf::RenderWindow& window) {
                         if (insideBoard) {
                             player.ships[i].col = static_cast<int>((pos.x - 600.f) / 60.f);
                             player.ships[i].row = static_cast<int>((pos.y - 150.f) / 60.f);
-                            player.shipShapes[i].setPosition({600.f + player.ships[i].col * 60.f, 150.f + player.ships[i].row * 60.f});
+                            player.shipShapes[i].setPosition({600.f + player.ships[i].col * 60.f,
+                                150.f + player.ships[i].row * 60.f});
                             player.ships[i].isPlaced = true;
                         }
                     }
@@ -157,7 +162,7 @@ bool placeShips(Player& player, sf::RenderWindow& window) {
             }
     return true;
 }
-std::pair<int, int> attack(Player& player, sf::RenderWindow& window) {
+std::pair<int, int> attack(Player& player) {
     int rowHit = -1, colHit = -1;
     auto mousePosition = sf::Vector2f(sf::Mouse::getPosition(window));
     static bool wasLeftDown = false;
@@ -169,8 +174,7 @@ std::pair<int, int> attack(Player& player, sf::RenderWindow& window) {
                             if (player.trackingBoard[i][j].getGlobalBounds().contains(mousePosition) &&
                                 player.trackingBoard[i][j].getFillColor() != sf::Color::Red &&
                                 player.trackingBoard[i][j].getFillColor() != customWhite &&
-                                player.trackingBoard[i][j].getFillColor() != sf::Color::Cyan &&
-                                player.trackingBoard[i][j].getFillColor() != customWhite) {
+                                player.trackingBoard[i][j].getFillColor() != sf::Color::Cyan) {
                                 player.trackingBoard[i][j].setFillColor(sf::Color::Yellow);
                                 if(leftPressedNow) {
                                     sf::Vector2f hitLocation(mousePosition);
@@ -187,7 +191,7 @@ std::pair<int, int> attack(Player& player, sf::RenderWindow& window) {
     wasLeftDown = leftDown;
     return {rowHit, colHit};
 }
-bool handleOpponentAttack(Player& player, sf::RenderWindow& window, int rowHit, int colHit) {
+bool handleOpponentAttack(Player& player, int rowHit, int colHit) {
     bool hitFound = false;
    for (int i = 0; i < 5; i++) {
        for (int j = 0; j<player.ships[i].length; j++) {
@@ -218,7 +222,6 @@ bool playerWins(Player& player) {
     return player.hitCount == 15;
 }
 void resetPlayerData(Player& player) {
-
     player.shipShapes[0].setPosition({1620.f, 180.f});
     player.shipShapes[1].setPosition({1720.f, 180.f});
     player.shipShapes[2].setPosition({1720.f, 440.f});
@@ -231,8 +234,9 @@ void resetPlayerData(Player& player) {
             player.trackingBoard[i][j].setFillColor(sf::Color::Blue);
         }
     }
-
     for (int i = 0; i < 5; i++) {
+        player.shipShapes[i].setSize({60.f, player.ships[i].length * 60.f});
+        player.shipShapes[i].setSize({60.f, player.ships[i].length * 60.f});
         player.ships[i].cellsHit = 0;
         player.ships[i].sunkReported = false;
         player.ships[i].isPlaced = false;
@@ -324,12 +328,10 @@ int main() {
     sf::Text playerOneText(font);
     playerOneText.setString("Player 1");
 
-
     sf::Text waitingText(font, "Waiting for a client to connect...");
     waitingText.setPosition({700.f, 400.f});
 
     sf::Text player2(font, "Player 2");
-    player2.setPosition({850.f, 30.f});
 
     sf::Text placeShipsText(font);
     placeShipsText.setString("Place Ships");
@@ -467,8 +469,10 @@ int main() {
              if (currentScreen == CONNECTING) {
                 if (!awaitingIpInput) {
                     window.draw(connectingPrompt);
-                    serverButton.setFillColor(serverButton.getGlobalBounds().contains(mousePosition) ? sf::Color::Green : sf::Color::Blue);
-                    clientButton.setFillColor(clientButton.getGlobalBounds().contains(mousePosition) ? sf::Color::Green : sf::Color::Blue);
+                    serverButton.setFillColor(serverButton.getGlobalBounds().contains(mousePosition) ?
+                        sf::Color::Green : sf::Color::Blue);
+                    clientButton.setFillColor(clientButton.getGlobalBounds().contains(mousePosition) ?
+                        sf::Color::Green : sf::Color::Blue);
                     window.draw(serverButton);
                     window.draw(serverButtonText);
                     window.draw(clientButton);
@@ -555,9 +559,10 @@ int main() {
                     lineOne.setPosition({600.f, 150.f + i * 60.f});
                     window.draw(lineOne);
                 }
-                if (placeShips(playerOne, window)) {
+                if (placeShips(playerOne)) {
                     playerOne.shipLocations = storeShipLocations(playerOne.ships, 5);
-                    if (!isOverlapping(playerOne.shipLocations, playerOne.ships, 5) && !isHanging(playerOne.shipLocations, playerOne.ships, 5)) {
+                    if (!isOverlapping(playerOne.shipLocations, playerOne.ships, 5) &&
+                        !isHanging(playerOne.shipLocations, playerOne.ships, 5)) {
                         nextPlayer.setFillColor(sf::Color::Blue);
                         if (nextPlayer.getGlobalBounds().contains(mousePosition)) {
                             nextPlayer.setFillColor(sf::Color::Green);
@@ -601,14 +606,17 @@ int main() {
                         currentScreen = BATTLESHIP;
                     }
                 for (int i = 0; i < 5; i++) {
-                    playerOne.shipShapes[i].setFillColor(playerOne.shipShapes[i].getGlobalBounds().contains(mousePosition) ?
-                        sf::Color(255, 0, 0, 150) : sf::Color(0, 255, 0, 150));
+                    playerOne.shipShapes[i].setFillColor(playerOne.shipShapes[i].getGlobalBounds()
+                        .contains(mousePosition) ?
+                        sf::Color(255, 0, 0, 150) :
+                        sf::Color(0, 255, 0, 150));
                 }
                 for (int i = 0; i < 5; i++) {
                     window.draw(playerOne.shipShapes[i]);
                 }
             }
             else if (currentScreen == PLAYER_TWO) {
+                player2.setPosition({850.f, 30.f});
                 nextPlayer.setFillColor(customWhite);
                 window.draw(player2);
                 window.draw(placeShipsText);
@@ -645,7 +653,7 @@ int main() {
                 for (int i = 0; i < 5; i++) {
                     window.draw(playerTwo.shipShapes[i]);
                 }
-                if (placeShips(playerTwo, window)) {
+                if (placeShips(playerTwo)) {
                     playerTwo.shipLocations = storeShipLocations(playerTwo.ships, 5);
                     if (!isOverlapping(playerTwo.shipLocations, playerTwo.ships, 5)
                         && !isHanging(playerTwo.shipLocations, playerTwo.ships, 5)) {
@@ -692,8 +700,10 @@ int main() {
                     currentScreen = BATTLESHIP;
                 }
                 for (int i = 0; i < 5; i++) {
-                    playerTwo.shipShapes[i].setFillColor(playerTwo.shipShapes[i].getGlobalBounds().contains(mousePosition) ?
-                        sf::Color(255, 0, 0, 150) : sf::Color(0, 255, 0, 150));
+                    playerTwo.shipShapes[i].setFillColor(playerTwo.shipShapes[i].getGlobalBounds()
+                        .contains(mousePosition) ?
+                        sf::Color(255, 0, 0, 150) :
+                        sf::Color(0, 255, 0, 150));
                 }
             }
             else if (currentScreen == BATTLESHIP) {
@@ -737,8 +747,10 @@ int main() {
                         window.draw(lineOneTrackingHorizontal);
                     }
                     for (int i = 0; i < 5; i++) {
-                        playerOne.shipShapes[i].setPosition({(600.f + playerOne.ships[i].col * 60.f) - 400.f, 150.f + playerOne.ships[i].row * 60.f});
-                        playerTwo.shipShapes[i].setPosition({(600.f + playerTwo.ships[i].col * 60.f) - 400.f, 150.f + playerTwo.ships[i].row * 60.f});
+                        playerOne.shipShapes[i].setPosition({(600.f + playerOne.ships[i].col * 60.f) - 400.f,
+                            150.f + playerOne.ships[i].row * 60.f});
+                        playerTwo.shipShapes[i].setPosition({(600.f + playerTwo.ships[i].col * 60.f) - 400.f,
+                            150.f + playerTwo.ships[i].row * 60.f});
                         window.draw(playerOne.shipShapes[i]);
                     }
                     sf::Packet incoming;
@@ -758,15 +770,17 @@ int main() {
                                 message = HIT_RESULT;
                                 incoming >> rowHit >> colHit;
                                 sf::Packet isHit;
-                                bool hitResult = handleOpponentAttack(playerOne, window, rowHit, colHit);
+                                bool hitResult = handleOpponentAttack(playerOne, rowHit, colHit);
                                 shipSunk.setString("");
                                 attackFeedback.setPosition({850.f, 400.f});
                                 if (hitResult) {
-                                    std::string attackCoordinate = "Opponent Attack: \n Hit! " + std::to_string(rowHit+1) + ":" + std::to_string(colHit+1);
+                                    std::string attackCoordinate = "Opponent Attack: \n Hit! " +
+                                        std::to_string(rowHit+1) + ":" + std::to_string(colHit+1);
                                     attackFeedback.setString(attackCoordinate);
                                 }
                                 else if (!hitResult) {
-                                    std::string attackCoordinate = "Opponent Attack: \n Miss! " + std::to_string(rowHit+1) + ":" + std::to_string(colHit+1);
+                                    std::string attackCoordinate = "Opponent Attack: \n Miss! " +
+                                        std::to_string(rowHit+1) + ":" + std::to_string(colHit+1);
                                     attackFeedback.setString(attackCoordinate);
                                 }
                                 isHit << message << hitResult << rowHit << colHit;
@@ -779,7 +793,8 @@ int main() {
                                     shipSunk.setPosition({840.f, 250.f});
                                     sunkShipPacket << message << static_cast<std::int32_t>(sunkShip->size());
                                     for (const auto& location : *sunkShip) {
-                                        sunkShipPacket << static_cast<std::int32_t>(location.first) << static_cast<std::int32_t>(location.second);
+                                        sunkShipPacket << static_cast<std::int32_t>(location.first)
+                                        << static_cast<std::int32_t>(location.second);
                                         playerOne.board[location.first][location.second].setFillColor(sf::Color::Magenta);
                                     }
                                     socket.send(sunkShipPacket);
@@ -790,7 +805,8 @@ int main() {
                                 int rowHit, colHit;
                                 incoming >> isHit >> rowHit >> colHit;
                                 if (isHit) {
-                                    std::string attackCoordinate = "Hit! " + std::to_string(rowHit+1) + ":" + std::to_string(colHit+1);
+                                    std::string attackCoordinate = "Hit! " + std::to_string(rowHit+1)
+                                    + ":" + std::to_string(colHit+1);
                                     shipSunk.setString("");
                                     attackFeedback.setPosition({900.f, 400.f});
                                     attackFeedback.setString(attackCoordinate);
@@ -810,7 +826,8 @@ int main() {
                                 else if (!isHit) {
                                     turnFeedback.setString("Player 2's Turn");
                                     attackFeedback.setPosition({900.f, 400.f});
-                                    std::string attackCoordinate = "Miss! " + std::to_string(rowHit+1) + ":" + std::to_string(colHit+1);
+                                    std::string attackCoordinate = "Miss! " + std::to_string(rowHit+1)
+                                    + ":" + std::to_string(colHit+1);
                                     turnFeedback.setPosition({870.f, 350.f});
                                     shipSunk.setString("");
                                     attackFeedback.setString(attackCoordinate);
@@ -840,7 +857,7 @@ int main() {
                     if (isPlayerOneTurn) {
                         turnFeedback.setPosition({900.f, 350.f});
                         turnFeedback.setString("Your turn");
-                        std::pair<int, int> hitPair = attack(playerOne, window);
+                        std::pair<int, int> hitPair = attack(playerOne);
                         if (hitPair.first != -1 && hitPair.second != -1) {
                             sf::Packet rowAndColHit;
                             rowAndColHit << ATTACK << hitPair.first << hitPair.second;
@@ -889,7 +906,8 @@ int main() {
                 window.draw(lineOneTrackingHorizontal);
             }
             for (int i = 0; i < 5; i++) {
-                playerTwo.shipShapes[i].setPosition({(600.f + playerTwo.ships[i].col * 60.f) - 400.f, 150.f + playerTwo.ships[i].row * 60.f});
+                playerTwo.shipShapes[i].setPosition({(600.f + playerTwo.ships[i].col * 60.f) - 400.f,
+                    150.f + playerTwo.ships[i].row * 60.f});
                 window.draw(playerTwo.shipShapes[i]);
             }
                     sf::Packet receivedAttack;
@@ -908,15 +926,17 @@ int main() {
                             receivedAttack >> rowHit >> colHit;
                             sf::Packet isHit;
                             message = HIT_RESULT;
-                            bool hitResult = handleOpponentAttack(playerTwo, window, rowHit, colHit);
+                            bool hitResult = handleOpponentAttack(playerTwo, rowHit, colHit);
                             shipSunk.setString("");
                             attackFeedback.setPosition({850.f, 400.f});
                             if (hitResult) {
-                                std::string attackCoordinate = "Opponent Attack: \n Hit! " + std::to_string(rowHit+1) + ":" + std::to_string(colHit+1);
+                                std::string attackCoordinate = "Opponent Attack: \n Hit! "
+                                + std::to_string(rowHit+1) + ":" + std::to_string(colHit+1);
                                 attackFeedback.setString(attackCoordinate);
                             }
                             else if (!hitResult) {
-                                std::string attackCoordinate = "Opponent Attack: \n Miss! " + std::to_string(rowHit+1) + ":" + std::to_string(colHit+1);
+                                std::string attackCoordinate = "Opponent Attack: \n Miss! "
+                                + std::to_string(rowHit+1) + ":" + std::to_string(colHit+1);
                                 attackFeedback.setString(attackCoordinate);
                             }
                             isHit << message << hitResult << rowHit << colHit;
@@ -929,7 +949,8 @@ int main() {
                                 shipSunk.setPosition({840.f, 250.f});
                                 sunkShipPacket << message << static_cast<std::int32_t>(sunkShip->size());
                                 for (const auto& location : *sunkShip) {
-                                    sunkShipPacket << static_cast<std::int32_t>(location.first) << static_cast<std::int32_t>(location.second);
+                                    sunkShipPacket << static_cast<std::int32_t>(location.first)
+                                    << static_cast<std::int32_t>(location.second);
                                     playerTwo.board[location.first][location.second].setFillColor(sf::Color::Magenta);
                                 }
                                 socket.send(sunkShipPacket);
@@ -940,7 +961,8 @@ int main() {
                             int rowHit, colHit;
                             receivedAttack >> isHit >> rowHit >> colHit;
                             if (isHit) {
-                                std::string attackCoordinate = "Hit! " + std::to_string(rowHit+1) + ":" + std::to_string(colHit+1);
+                                std::string attackCoordinate = "Hit! " + std::to_string(rowHit+1)
+                                + ":" + std::to_string(colHit+1);
                                 shipSunk.setString("");
                                 attackFeedback.setPosition({900.f, 400.f});
                                 attackFeedback.setString(attackCoordinate);
@@ -960,7 +982,8 @@ int main() {
                             else if (!isHit) {
                                 turnFeedback.setString("Player 1's turn");
                                 attackFeedback.setPosition({900.f, 400.f});
-                                std::string attackCoordinate = "Miss! " + std::to_string(rowHit+1) + ":" + std::to_string(colHit+1);
+                                std::string attackCoordinate = "Miss! " + std::to_string(rowHit+1)
+                                + ":" + std::to_string(colHit+1);
                                 turnFeedback.setPosition({870.f, 350.f});
                                 shipSunk.setString("");
                                 attackFeedback.setString(attackCoordinate);
@@ -990,7 +1013,7 @@ int main() {
                     if (isPlayerTwoTurn) {
                         turnFeedback.setPosition({900.f, 350.f});
                         turnFeedback.setString("Your turn");
-                        std::pair <int, int> hitPair = attack(playerTwo, window);
+                        std::pair <int, int> hitPair = attack(playerTwo);
                         if (hitPair.first != -1 && hitPair.second != -1) {
                             sf::Packet rowAndHitCol;
                             rowAndHitCol << ATTACK << hitPair.first << hitPair.second;
@@ -1036,7 +1059,8 @@ int main() {
 
                 if (connectionType == 's') {
                     for (int k = 0; k < 5; k++) {
-                        playerOne.shipShapes[k].setPosition({600.f + playerOne.ships[k].col * 60.f, 150.f + playerOne.ships[k].row * 60.f});
+                        playerOne.shipShapes[k].setPosition({600.f + playerOne.ships[k].col * 60.f,
+                            150.f + playerOne.ships[k].row * 60.f});
                         window.draw(playerOne.shipShapes[k]);
                     }
                     if (playAgain.getGlobalBounds().contains(mousePosition)) {
@@ -1073,7 +1097,8 @@ int main() {
                 }
                 else if (connectionType == 'c') {
                     for (int k = 0; k < 5; k++) {
-                        playerTwo.shipShapes[k].setPosition({600.f + playerTwo.ships[k].col * 60.f, 150.f + playerTwo.ships[k].row * 60.f});
+                        playerTwo.shipShapes[k].setPosition({600.f + playerTwo.ships[k].col * 60.f,
+                            150.f + playerTwo.ships[k].row * 60.f});
                         window.draw(playerTwo.shipShapes[k]);
                     }
                     if (playAgain.getGlobalBounds().contains(mousePosition)) {
@@ -1098,6 +1123,8 @@ int main() {
                         clicked = false;
                         Clicked = false;
                         opponentIsReady = false;
+                        playerOneText.setPosition({850.f, 30.f});
+                        player2.setPosition({850.f, 30.f});
                         attackFeedback.setString("");
                         turnFeedback.setString("");
                         shipSunk.setString("");

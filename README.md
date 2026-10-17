@@ -7,7 +7,7 @@ A 2D Battleship game built in C++ with SFML, supporting both local two-player (h
 - **Drag-and-drop ship placement** with offset-based dragging, right-click rotation, overlap/bounds validation, and grid snapping
 - **LAN multiplayer** using `sf::TcpListener` / `sf::TcpSocket`, with a host/join connection flow and a live "Hosting on: `<ip>`" display
 - **Custom tagged-message protocol** over `sf::Packet` (`ATTACK`, `HIT_RESULT`, `TURN_DONE`, `SUNK_SHIP`, `GAME_END`) synchronizing turn state between host and client
-- **Defender-authoritative hit resolution** — the receiving player's machine determines hit/miss/sunk, then reports the result back, avoiding desync between the two boards
+- **Defender-authoritative hit resolution** where the receiving player's machine determines hit/miss/sunk, then reports the result back, avoiding desync between the two boards
 - **Sunk-ship detection**, highlighting all cells of a destroyed ship in cyan on both the owner's board and the opponent's tracking board
 - **Win detection and a "play again" flow** that resets both boards without restarting the connection
 - **Disconnect handling** with a dedicated screen if the opponent drops

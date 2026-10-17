@@ -17,7 +17,7 @@ sf::Socket::Status tryAccept(sf::TcpListener& listener, sf::TcpSocket& socket) {
         socket.setBlocking(false); // switch the game socket to non-blocking once connected
         std::cout << "Client connected!" << std::endl;
     }
-    return status; // Done, NotReady, or Error — caller decides what to do
+    return status; // Done, NotReady, or Error, caller decides what to do
 }
 
 bool startJoining(sf::TcpSocket& socket, const std::string& hostIp) {
