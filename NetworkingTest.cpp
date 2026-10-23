@@ -6,6 +6,8 @@
 #include "Network.h"
 sf::RenderWindow window(sf::VideoMode({1920, 1080}),
     "Battleship", sf::Style::Titlebar | sf::Style::Close);
+sf::Font font("AsapSharp.ttf");
+sf::Color customWhite(255, 255, 255, 180);
 class Ship {
 public:
     int length;
@@ -31,7 +33,45 @@ public:
     bool isReady = false;
     bool playAgain = false;
 };
+class UI {
+public:
+    sf::RectangleShape instructionBorder{{450.f, 450.f}};
+    sf::Text instructionText{font, "INSTRUCTIONS"};
+    std::vector<std::string> instructions;
+    sf::RectangleShape shipLoader{{200.f, 560.f}};
+    sf::Text readyText{font, "Ready!"};
+    sf::Text playerIsReadyText{font};
+    sf::RectangleShape readyButton{{180.f, 90.f}};
+    sf::Text placeShipsText{font, "Place ships"};
+    sf::Text playerLabel{font, "Player"};
+    sf::RectangleShape verGridLine{{1.f, 600.f}};
+    sf::RectangleShape horGridLine{{600.f, 1.f}};
+    UI() {
+        instructionBorder.setPosition({50.f, 250.f});
+        instructionBorder.setFillColor(sf::Color::Red);
+        instructionText.setPosition({150.f, 280.f});
+        instructions = {
+            "- Drag ships onto your board",
+            "- Right-click a ship to rotate it",
+            "- Ships cannot overlap",
+            "- Ships cannot be hanging",
+            "- Click ready when all ships",
+            " are placed"
+        };
+        shipLoader.setPosition({1600.f, 160.f});
+        readyText.setPosition({1650.f, 775.f});
+        playerIsReadyText.setPosition({150.f, 200.f});
+        readyButton.setPosition({1610.f, 750.f});
+        readyButton.setFillColor(customWhite);
+        placeShipsText.setPosition({820.f, 800.f});
+        playerLabel.setPosition({850.f, 30.f});
+        verGridLine.setFillColor(sf::Color::Black);
+        horGridLine.setFillColor(sf::Color::Black);
+    }
+
+};
 Player playerOne, playerTwo;
+UI gameUI;
 enum screen {
     CONNECTING,
     CONNECTING_TO_HOST,
@@ -54,7 +94,6 @@ enum MessageType {
     SUNK_SHIP,
     GAME_END
 };
-sf::Color customWhite(255, 255, 255, 180);
 std::vector<std::vector<std::pair<int, int>>> storeShipLocations(Ship ships[], int size) {
     std::vector<std::vector<std::pair<int, int>>> shipLocations(size);
     for (int i = 0; i < size; i++) {
@@ -91,7 +130,7 @@ bool isOverlapping(std::vector<std::vector<std::pair<int, int>>> playerShipLocat
 }
 bool isHanging(std::vector<std::vector<std::pair<int, int>>> playerShipLocations,
     Ship ships[], int size) {
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < size; i++) {
         for (int j = 0; j < ships[i].length; j++) {
             if (playerShipLocations[i][j].first > 9 || playerShipLocations[i][j].first < 0
                 || playerShipLocations[i][j].second > 9 || playerShipLocations[i][j].second < 0) {
@@ -221,7 +260,7 @@ std::optional<std::vector<std::pair<int, int>>> handleSunkShip(Player& player) {
 bool playerWins(Player& player) {
     return player.hitCount == 15;
 }
-void resetPlayerData(Player& player) {
+void resetPlayerData(Player& player, UI *gameUI) {
     player.shipShapes[0].setPosition({1620.f, 180.f});
     player.shipShapes[1].setPosition({1720.f, 180.f});
     player.shipShapes[2].setPosition({1720.f, 440.f});
@@ -247,6 +286,44 @@ void resetPlayerData(Player& player) {
         player.isReady = false;
         player.playAgain = false;
         player.shipLocations.clear();
+        gameUI->readyButton.setFillColor(customWhite);
+        gameUI->placeShipsText.setString("Place Ships");
+        gameUI->placeShipsText.setPosition({820.f, 800.f});
+    }
+}
+
+void buildUI(Player& player, UI *gameUI, char connectionType) {
+    connectionType == 's'? gameUI->playerLabel.setString("Player 1"):
+    gameUI->playerLabel.setString("Player 2");
+    window.draw(gameUI->playerLabel);
+    window.draw(gameUI->placeShipsText);
+    window.draw(gameUI->shipLoader);
+    window.draw(gameUI->instructionBorder);
+    window.draw(gameUI->instructionText);
+    window.draw(gameUI->readyButton);
+    window.draw(gameUI->readyText);
+
+    for (size_t i = 0; i < gameUI->instructions.size()-1; i++) {
+        sf::Text line(font, gameUI->instructions[i]);
+        line.setPosition({70.f, 360.f + i * 60.f});
+        window.draw(line);
+    }
+    sf::Text line(font, gameUI->instructions[5]);
+    line.setPosition({170.f, 630.f});
+    window.draw(line);
+    for (int i = 0; i < 10; i++) {
+        for (int j = 0; j < 10; j++) {
+            window.draw(player.board[i][j]);
+        }
+    }
+    for (int i = 0; i <= 10; i++) {
+        gameUI->verGridLine.setPosition({600.f + i * 60.f, 150.f});
+        gameUI->horGridLine.setPosition({600.f, 150.f + i * 60.f});
+        window.draw(gameUI->horGridLine);
+        window.draw(gameUI->verGridLine);
+    }
+    for (int i = 0; i < 5; i++) {
+        window.draw(player.shipShapes[i]);
     }
 }
 
@@ -262,8 +339,6 @@ int main() {
     sf::RectangleShape startButton({200.f, 100.f});
     startButton.setFillColor(sf::Color::White);
     startButton.setPosition({810.f, 670.f});
-
-    sf::Font font("AsapSharp.ttf");
 
     sf::RectangleShape serverButton({250.f, 100.f});
     serverButton.setPosition({700.f, 400.f});
@@ -321,20 +396,19 @@ int main() {
     sf::Clock connectTimeoutClock;
     std::optional<sf::IpAddress> myIp = sf::IpAddress::getLocalAddress();
 
-    sf::Text ip(font);
-    ip.setString("Hosting on: " + myIp->toString());
+    sf::Text ip(font, "Hosting on: " + myIp->toString());
     ip.setPosition({750.f, 500.f});
-
-    sf::Text playerOneText(font);
-    playerOneText.setString("Player 1");
 
     sf::Text waitingText(font, "Waiting for a client to connect...");
     waitingText.setPosition({700.f, 400.f});
 
-    sf::Text player2(font, "Player 2");
+    sf::Text playerOneText(font, "Player 1");
+    playerOneText.setPosition({850.f, 30.f});
 
-    sf::Text placeShipsText(font);
-    placeShipsText.setString("Place Ships");
+    sf::Text player2(font, "Player 2");
+    player2.setPosition({850.f, 30.f});
+
+    sf::Text placeShipsText(font, "Place Ships");
     placeShipsText.setPosition({820.f, 800.f});
 
     sf::RectangleShape instructionsBorder({450.f, 450.f});
@@ -346,7 +420,7 @@ int main() {
     playAgain.setFillColor(sf::Color::Red);
 
     sf::Text playAgainText(font, "Play Again");
-    playAgainText.setPosition({820.f, 830.f});
+    playAgainText.setPosition({830.f, 830.f});
 
     std::vector<std::string> instructions{
         "- Drag ships onto your board",
@@ -359,16 +433,11 @@ int main() {
     sf::Text attackFeedback(font);
     attackFeedback.setPosition({900.f, 400.f});
 
-    sf::Text turnFeedback(font);
+    sf::Text turnFeedback(font, "");
     turnFeedback.setPosition({900.f, 350.f});
 
     sf::Text instructionsText(font, "INSTRUCTIONS");
     instructionsText.setPosition({150.f, 280.f});
-    sf::RectangleShape nextPlayer({180.f, 90.f});
-    nextPlayer.setPosition({1610.f, 750.f});
-
-    sf::Text readyText(font, "Ready!");
-    readyText.setPosition({1650.f, 775.f});
 
     sf::Text battle(font, "Battle!");
     battle.setPosition({1655.f, 775.f});
@@ -525,47 +594,14 @@ int main() {
                  }
              }
             else if (currentScreen == PLAYER_ONE) {
-                playerOneText.setPosition({850.f, 30.f});
-                nextPlayer.setFillColor(customWhite);
-                window.draw(playerOneText);
-                window.draw(placeShipsText);
-                window.draw(shipLoader);
-                window.draw(instructionsBorder);
-                window.draw(instructionsText);
-                window.draw(nextPlayer);
-                window.draw(readyText);
-                for (size_t i = 0; i < instructions.size()-1; i++) {
-                    sf::Text line(font, instructions[i]);
-                    line.setPosition({70.f, 360.f + i * 60.f});
-                    window.draw(line);
-                }
-                sf::Text line(font, instructions[5]);
-                line.setPosition({170.f, 630.f});
-                window.draw(line);
-                for (int i = 0; i < 10; i++) {
-                    for (int j = 0; j < 10; j++) {
-                        window.draw(playerOne.board[i][j]);
-                    }
-                }
-                for (int j = 0; j <= 10; j++) {
-                    sf::RectangleShape lineOne({1.f, 600.f});
-                    lineOne.setFillColor(sf::Color::Black);
-                    lineOne.setPosition({600.f + j * 60.f, 150.f});
-                    window.draw(lineOne);
-                }
-                for (int i = 0; i <= 10; i++) {
-                    sf::RectangleShape lineOne({600.f, 1.f});
-                    lineOne.setFillColor(sf::Color::Black);
-                    lineOne.setPosition({600.f, 150.f + i * 60.f});
-                    window.draw(lineOne);
-                }
+                buildUI(playerOne, &gameUI, connectionType);
                 if (placeShips(playerOne)) {
                     playerOne.shipLocations = storeShipLocations(playerOne.ships, 5);
                     if (!isOverlapping(playerOne.shipLocations, playerOne.ships, 5) &&
                         !isHanging(playerOne.shipLocations, playerOne.ships, 5)) {
-                        nextPlayer.setFillColor(sf::Color::Blue);
-                        if (nextPlayer.getGlobalBounds().contains(mousePosition)) {
-                            nextPlayer.setFillColor(sf::Color::Green);
+                        gameUI.readyButton.setFillColor(sf::Color::Blue);
+                        if (gameUI.readyButton.getGlobalBounds().contains(mousePosition)) {
+                            gameUI.readyButton.setFillColor(sf::Color::Green);
                             if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {
                                 if (!clicked && !playerOne.isReady) {
                                     clicked = true;
@@ -574,9 +610,9 @@ int main() {
                                     sf::Packet ready;
                                     ready << playerOne.isReady;
                                     socket.send(ready);
-                                    placeShipsText.setString("Ready! Waiting for player 2 ...");
-                                    placeShipsText.setPosition({700.f, 800.f});
-                                    window.draw(placeShipsText);
+                                    gameUI.placeShipsText.setString("Ready! Waiting for player 2 ...");
+                                    gameUI.placeShipsText.setPosition({700.f, 800.f});
+                                    window.draw(gameUI.placeShipsText);
                                 }
                             }
                             else {
@@ -584,10 +620,10 @@ int main() {
                             }
                         }
                         else {
-                            nextPlayer.setFillColor(sf::Color::Blue);
+                            gameUI.readyButton.setFillColor(sf::Color::Blue);
                         }
-                        window.draw(nextPlayer);
-                        window.draw(readyText);
+                        window.draw(gameUI.readyButton);
+                        window.draw(gameUI.readyText);
                     }
                 }
                 sf::Packet received;
@@ -611,55 +647,16 @@ int main() {
                         sf::Color(255, 0, 0, 150) :
                         sf::Color(0, 255, 0, 150));
                 }
-                for (int i = 0; i < 5; i++) {
-                    window.draw(playerOne.shipShapes[i]);
-                }
             }
             else if (currentScreen == PLAYER_TWO) {
-                player2.setPosition({850.f, 30.f});
-                nextPlayer.setFillColor(customWhite);
-                window.draw(player2);
-                window.draw(placeShipsText);
-                window.draw(shipLoader);
-                window.draw(instructionsBorder);
-                window.draw(instructionsText);
-                window.draw(nextPlayer);
-                window.draw(readyText);
-                for (size_t i = 0; i < instructions.size()-1; i++) {
-                    sf::Text line(font, instructions[i]);
-                    line.setPosition({70.f, 350.f + i * 60.f});
-                    window.draw(line);
-                }
-                sf::Text line(font, instructions[5]);
-                line.setPosition({170.f, 630.f});
-                window.draw(line);
-                for (int i = 0; i < 10; i++) {
-                    for (int j = 0; j < 10; j++) {
-                        window.draw(playerTwo.board[i][j]);
-                    }
-                }
-                for (int j = 0; j <= 10; j++) {
-                    sf::RectangleShape lineTwoVertical({1.f, 600.f});
-                    lineTwoVertical.setFillColor(sf::Color::Black);
-                    lineTwoVertical.setPosition({600.f + j * 60.f, 150.f});
-                    window.draw(lineTwoVertical);
-                }
-                for (int i = 0; i <= 10; i++) {
-                    sf::RectangleShape lineTwoHorizontal({600.f, 1.f});
-                    lineTwoHorizontal.setFillColor(sf::Color::Black);
-                    lineTwoHorizontal.setPosition({600.f, 150.f + i * 60.f});
-                    window.draw(lineTwoHorizontal);
-                }
-                for (int i = 0; i < 5; i++) {
-                    window.draw(playerTwo.shipShapes[i]);
-                }
+                buildUI(playerTwo, &gameUI, connectionType);
                 if (placeShips(playerTwo)) {
                     playerTwo.shipLocations = storeShipLocations(playerTwo.ships, 5);
                     if (!isOverlapping(playerTwo.shipLocations, playerTwo.ships, 5)
                         && !isHanging(playerTwo.shipLocations, playerTwo.ships, 5)) {
-                        nextPlayer.setFillColor(sf::Color::Blue);
-                        if (nextPlayer.getGlobalBounds().contains(mousePosition)) {
-                            nextPlayer.setFillColor(sf::Color::Green);
+                        gameUI.readyButton.setFillColor(sf::Color::Blue);
+                        if (gameUI.readyButton.getGlobalBounds().contains(mousePosition)) {
+                            gameUI.readyButton.setFillColor(sf::Color::Green);
                             if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {
                                 if (!Clicked && !playerTwo.isReady) {
                                     Clicked = true;
@@ -668,9 +665,9 @@ int main() {
                                     sf::Packet ready;
                                     ready << playerTwo.isReady;
                                     socket.send(ready);
-                                    placeShipsText.setString("Ready! Waiting for player 1 ...");
-                                    placeShipsText.setPosition({700.f, 800.f});
-                                    window.draw(placeShipsText);
+                                    gameUI.placeShipsText.setString("Ready! Waiting for player 1 ...");
+                                    gameUI.placeShipsText.setPosition({700.f, 800.f});
+                                    window.draw(gameUI.placeShipsText);
                                 }
                             }
                             else {
@@ -678,10 +675,10 @@ int main() {
                             }
                         }
                         else {
-                            nextPlayer.setFillColor(sf::Color::Blue);
+                            gameUI.readyButton.setFillColor(sf::Color::Blue);
                         }
-                        window.draw(nextPlayer);
-                        window.draw(readyText);
+                        window.draw(gameUI.readyButton);
+                        window.draw(gameUI.readyText);
                     }
                 }
                 sf::Packet received;
@@ -1021,6 +1018,10 @@ int main() {
                             isPlayerTwoTurn = false;
                         }
                     }
+                    else {
+                        turnFeedback.setString("Player 1's turn");
+                        turnFeedback.setPosition({870.f, 350.f});
+                    }
                 }
             }
             else if (currentScreen == GAME_OVER) {
@@ -1066,10 +1067,10 @@ int main() {
                     if (playAgain.getGlobalBounds().contains(mousePosition)) {
                         playAgain.setFillColor(sf::Color::Magenta);
                         if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left) && !playerOne.playAgain) {
-                            sf::Packet playAgain;
+                            sf::Packet playAgainPacket;
                             playerOne.playAgain = true;
-                            playAgain << playerOne.playAgain;
-                            socket.send(playAgain);
+                            playAgainPacket << playerOne.playAgain;
+                            socket.send(playAgainPacket);
                         }
                     }
                     else {
@@ -1091,7 +1092,7 @@ int main() {
                         placeShipsText.setString("Place Ships");
                         placeShipsText.setPosition({820.f, 800.f});
                         shipSunk.setPosition({900.f, 300.f});
-                        resetPlayerData(playerOne); resetPlayerData(playerTwo);
+                        resetPlayerData(playerOne, &gameUI); resetPlayerData(playerTwo, &gameUI);
                         currentScreen = PLAYER_ONE;
                     }
                 }
@@ -1131,7 +1132,7 @@ int main() {
                         placeShipsText.setString("Place Ships");
                         placeShipsText.setPosition({820.f, 800.f});
                         shipSunk.setPosition({900.f, 300.f});
-                        resetPlayerData(playerOne); resetPlayerData(playerTwo);
+                        resetPlayerData(playerOne, &gameUI); resetPlayerData(playerTwo, &gameUI);
                         currentScreen = PLAYER_TWO;
                     }
                 }
