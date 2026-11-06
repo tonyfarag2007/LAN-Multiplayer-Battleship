@@ -31,12 +31,12 @@ public:
     std::string myName, opponentName;
     int hitCount = 0;
     bool myTurn = false;
-    bool isReady = false;
-    bool playAgain = false;
-    bool opponentPlayAgain = false;
+    bool isReady = false, opponentIsReady = false;
+    bool playAgain = false, opponentPlayAgain = false;
 };
 class UI {
 public:
+    sf::Text ipInputText{font};
     sf::RectangleShape instructionBorder{{450.f, 450.f}};
     sf::Text instructionText{font, "INSTRUCTIONS"};
     std::vector<std::string> instructions;
@@ -44,6 +44,7 @@ public:
     sf::Text readyText{font, "Ready!"};
     sf::Text playerIsReadyText{font};
     sf::RectangleShape readyButton{{180.f, 90.f}};
+    sf::RectangleShape serverButton{{250.f, 100.f}};
     sf::Text placeShipsText{font, "Place ships"};
     sf::Text playerLabel{font, "Player"};
     sf::Text battleText{font, "Battle!"};
@@ -58,6 +59,7 @@ public:
     sf::RectangleShape horGridLine{{600.f, 1.f}};
     sf::RectangleShape playAgainButton{{200.f, 100.f}};
     UI() {
+        ipInputText.setPosition({700.f, 400.f});
         instructionBorder.setPosition({50.f, 250.f});
         instructionBorder.setFillColor(sf::Color::Red);
         instructionText.setPosition({170.f, 280.f});
@@ -74,6 +76,7 @@ public:
         playerIsReadyText.setPosition({150.f, 200.f});
         readyButton.setPosition({1610.f, 750.f});
         readyButton.setFillColor(customWhite);
+        serverButton.setPosition({700.f, 400.f});
         placeShipsText.setPosition({820.f, 800.f});
         playerLabel.setPosition({850.f, 30.f});
         battleText.setPosition({910.f, 30.f});
@@ -84,6 +87,7 @@ public:
         rematchText.setPosition({830.f, 870.f});
         disconnectedText.setPosition({730.f, 100.f});
         gameOver.setPosition({730.f, 100.f});
+        serverButton.setFillColor(sf::Color::Blue);
         verGridLine.setFillColor(sf::Color::Black);
         horGridLine.setFillColor(sf::Color::Black);
         playAgainButton.setFillColor(sf::Color::Red);
@@ -138,7 +142,7 @@ void drawBoard(float boardOffset, sf::RectangleShape board[][10], int rows, UI *
         window.draw(ui->verGridLine);
     }
 }
-void initializeShipLocations(Player& player) {
+void initializePlayerAssets(Player& player) {
     for (int i = 0; i < 5; i++) {
         player.shipShapes[i].setSize({60.f, player.ships[i].length * 60.f});
     }
@@ -147,16 +151,32 @@ void initializeShipLocations(Player& player) {
     player.shipShapes[2].setPosition({1720.f, 440.f});
     player.shipShapes[3].setPosition({1620.f, 500.f});
     player.shipShapes[4].setPosition({1620.f, 640.f});
+
+    for (int i = 0; i < 10; i++) {
+        for (int j = 0; j < 10; j++) {
+            player.board[i][j].setSize({60.f, 60.f});
+            player.board[i][j].setPosition({600.f + j * 60.f, 150.f + i * 60.f});
+            player.board[i][j].setFillColor(sf::Color::Blue);
+            player.board[i][j].setOutlineColor(sf::Color::Black);
+            player.board[i][j].setOutlineThickness(0.f);
+
+            player.trackingBoard[i][j].setSize({60.f, 60.f});
+            player.trackingBoard[i][j].setPosition({1120.f + j * 60.f, 150.f + i * 60.f});
+            player.trackingBoard[i][j].setFillColor(sf::Color::Blue);
+            player.trackingBoard[i][j].setOutlineColor(sf::Color::Black);
+            player.trackingBoard[i][j].setOutlineThickness(0.f);
+        }
+    }
 }
-bool isOverlapping(std::vector<std::vector<std::pair<int, int>>> playerShipLocations,
+bool isOverlapping(std::vector<std::vector<std::pair<int, int>>>& locations,
     Ship ships[], int size) {
-    for (int g = 0; g < 5; g++) {
+    for (int g = 0; g < size; g++) {
         int shipIndex = g;
-        for (int h = 0; h < 5; h++){
+        for (int h = 0; h < size; h++){
             if (h == shipIndex) continue;
             for (int i = 0; i < ships[g].length; i++) {
                 for (int j = 0; j < ships[h].length; j++) {
-                    if (playerShipLocations[g][i] == playerShipLocations[h][j]) {
+                    if (locations[g][i] == locations[h][j]) {
                         return true;
                     }
                 }
@@ -165,12 +185,12 @@ bool isOverlapping(std::vector<std::vector<std::pair<int, int>>> playerShipLocat
     }
     return false;
 }
-bool isHanging(std::vector<std::vector<std::pair<int, int>>> playerShipLocations,
+bool isHanging(std::vector<std::vector<std::pair<int, int>>>& locations,
     Ship ships[], int size) {
     for (int i = 0; i < size; i++) {
         for (int j = 0; j < ships[i].length; j++) {
-            if (playerShipLocations[i][j].first > 9 || playerShipLocations[i][j].first < 0
-                || playerShipLocations[i][j].second > 9 || playerShipLocations[i][j].second < 0) {
+            if (locations[i][j].first > 9 || locations[i][j].first < 0
+                || locations[i][j].second > 9 || locations[i][j].second < 0) {
                 return true;
             }
         }
@@ -245,7 +265,6 @@ std::pair<int, int> attack(Player& player) {
     static bool wasLeftDown = false;
     bool leftDown = sf::Mouse::isButtonPressed(sf::Mouse::Button::Left);
     bool leftPressedNow = leftDown && !wasLeftDown;
-    bool hit = false;
                 for (int i = 0; i<10; i++) {
                     for (int j = 0; j<10; j++) {
                             if (player.trackingBoard[i][j].getGlobalBounds().contains(mousePosition) &&
@@ -273,7 +292,7 @@ bool handleOpponentAttack(Player& player, int rowHit, int colHit) {
    for (int i = 0; i < 5; i++) {
        for (int j = 0; j<player.ships[i].length; j++) {
            if (player.shipLocations[i][j].first == rowHit && player.shipLocations[i][j].second == colHit) {
-               player.board[rowHit][colHit].setFillColor(sf::Color::Red);
+               player.board[rowHit][colHit].setFillColor(sf::Color::White);
                hitFound = true;
                player.ships[i].cellsHit++;
            }
@@ -299,7 +318,7 @@ bool playerWins(Player& player) {
     return player.hitCount == 15;
 }
 void resetPlayerData(Player& player, UI *ui, char connectionType) {
-    initializeShipLocations(player);
+    initializePlayerAssets(player);
 
     for (int i = 0; i < 10; i++) {
         for (int j = 0; j<10; j++) {
@@ -322,6 +341,7 @@ void resetPlayerData(Player& player, UI *ui, char connectionType) {
     }
     connectionType == 's'? player.myTurn = true: player.myTurn = false;
     player.opponentPlayAgain = false;
+    player.opponentIsReady = false;
     ui->readyButton.setFillColor(customWhite);
     ui->placeShipsText.setString("Place Ships");
     ui->attackFeedback.setString("");
@@ -362,10 +382,6 @@ int main() {
     std::string hostIpInput;
     bool awaitingIpInput = false;
 
-    sf::RectangleShape serverButton({250.f, 100.f});
-    serverButton.setPosition({700.f, 400.f});
-    serverButton.setFillColor(sf::Color::Blue);
-
     sf::Text serverButtonText(font, "Server");
     serverButtonText.setPosition({770.f, 430.f});
 
@@ -382,9 +398,6 @@ int main() {
     sf::Text ipPrompt(font, "Enter host IP, then press Enter:");
     ipPrompt.setPosition({700.f, 300.f});
 
-    sf::Text ipInputText(font);
-    ipInputText.setPosition({700.f, 400.f});
-
     sf::Text connectionErrorText(font);
     connectionErrorText.setFillColor(sf::Color::Red);
 
@@ -397,25 +410,9 @@ int main() {
     waitingText.setPosition({700.f, 400.f});
 
     bool clicked = false;
-    bool opponentIsReady = false;
 
-    initializeShipLocations(me);
-    for (int i = 0; i < 10; i++) {
-        for (int j = 0; j < 10; j++) {
-            me.board[i][j].setSize({60.f, 60.f});
-            me.board[i][j].setPosition({600.f + j * 60.f, 150.f + i * 60.f});
-            me.board[i][j].setFillColor(sf::Color::Blue);
-            me.board[i][j].setOutlineColor(sf::Color::Black);
-            me.board[i][j].setOutlineThickness(0.f);
-            me.trackingBoard[i][j].setSize({60.f, 60.f});
-            me.trackingBoard[i][j].setPosition({1120.f + j * 60.f, 150.f + i * 60.f});
-            me.trackingBoard[i][j].setFillColor(sf::Color::Blue);
-            me.trackingBoard[i][j].setOutlineColor(sf::Color::Black);
-            me.trackingBoard[i][j].setOutlineThickness(0.f);
-        }
-    }
-    sf::TcpSocket socket;
-    sf::TcpListener listener;
+    initializePlayerAssets(me);
+    sf::TcpSocket socket; sf::TcpListener listener;
         while (window.isOpen()) {
             while (const std::optional event = window.pollEvent()) {
                 if (event->is<sf::Event::Closed>())
@@ -457,11 +454,11 @@ int main() {
             if (currentScreen == CONNECTING) {
                 if (!awaitingIpInput) {
                     window.draw(connectingPrompt);
-                    serverButton.setFillColor(serverButton.getGlobalBounds().contains(mousePosition) ?
+                    gameUI.serverButton.setFillColor(gameUI.serverButton.getGlobalBounds().contains(mousePosition) ?
                         sf::Color::Green : sf::Color::Blue);
                     clientButton.setFillColor(clientButton.getGlobalBounds().contains(mousePosition) ?
                         sf::Color::Green : sf::Color::Blue);
-                    window.draw(serverButton);
+                    window.draw(gameUI.serverButton);
                     window.draw(serverButtonText);
                     window.draw(clientButton);
                     window.draw(clientButtonText);
@@ -470,7 +467,7 @@ int main() {
                     bool isClickedNow = sf::Mouse::isButtonPressed(sf::Mouse::Button::Left);
                     bool clickedThisFrame = isClickedNow && !wasClicked;
 
-                    if (clickedThisFrame && serverButton.getGlobalBounds().contains(mousePosition)) {
+                    if (clickedThisFrame && gameUI.serverButton.getGlobalBounds().contains(mousePosition)) {
                         connectionType = 's'; me.myName = "Player 1"; me.opponentName = "Player 2"; me.myTurn = true;
                         startHosting(listener);
                         currentScreen = WAITING_FOR_CLIENT;
@@ -483,8 +480,8 @@ int main() {
                 }
                 else {
                     window.draw(ipPrompt);
-                    ipInputText.setString(hostIpInput);
-                    window.draw(ipInputText);
+                    gameUI.ipInputText.setString(hostIpInput);
+                    window.draw(gameUI.ipInputText);
                     window.draw(connectionErrorText);
                 }
             }
@@ -500,6 +497,7 @@ int main() {
 
                 drawBoard(600.f, me.board, 10, &gameUI);
                 buildUI(me, &gameUI);
+
                 if (placeShips(me)) {
                     me.shipLocations = storeShipLocations(me.ships, 5);
                     if (!isOverlapping(me.shipLocations, me.ships, 5) &&
@@ -531,18 +529,18 @@ int main() {
                     currentScreen = DISCONNECTED;
                 }
                 if (status == sf::Socket::Status::Done) {
-                        received >> opponentIsReady;
+                        received >> me.opponentIsReady;
                 }
-                if (me.isReady && !opponentIsReady) {
+                if (me.isReady && !me.opponentIsReady) {
                     gameUI.placeShipsText.setString("Ready! Waiting for " + me.opponentName + " ...");
                     gameUI.placeShipsText.setPosition({715.f, 800.f});
                     window.draw(gameUI.placeShipsText);
                 }
-                if (!me.isReady && opponentIsReady) {
+                if (!me.isReady && me.opponentIsReady) {
                     gameUI.playerIsReadyText.setString(me.opponentName +" is ready!");
                     window.draw(gameUI.playerIsReadyText);
                 }
-                    if (me.isReady && opponentIsReady) {
+                    if (me.isReady && me.opponentIsReady) {
                         currentScreen = BATTLESHIP;
                     }
                 for (int i = 0; i < 5; i++) {
@@ -602,10 +600,10 @@ int main() {
                                     message = SUNK_SHIP;
                                     gameUI.shipSunk.setString( me.opponentName + " sunk your \n ship!");
                                     gameUI.shipSunk.setPosition({840.f, 250.f});
-                                    sunkShipPacket << message << static_cast<std::int32_t>(sunkShip->size());
+                                    sunkShipPacket << message << static_cast<int>(sunkShip->size());
                                     for (const auto& location : *sunkShip) {
                                         sunkShipPacket << location.first << location.second;
-                                        me.board[location.first][location.second].setFillColor(sf::Color::Magenta);
+                                        me.board[location.first][location.second].setFillColor(sf::Color::Black);
                                     }
                                     socket.send(sunkShipPacket);
                                 }
@@ -641,10 +639,9 @@ int main() {
                                 }
                             }
                         else if (message == SUNK_SHIP) {
-                            int count;
+                            int count, row, col;
                             incoming >> count;
                             for (int i = 0; i < count; i++) {
-                                std::int32_t row, col;
                                 incoming >> row >> col;
                                 me.trackingBoard[row][col].setFillColor(sf::Color::Cyan);
                                 gameUI.shipSunk.setString("Ship sunk!");
@@ -672,11 +669,13 @@ int main() {
                 }
             }
             else if (currentScreen == GAME_OVER) {
+
                 window.draw(gameUI.gameOver);
                 window.draw(gameUI.playAgainButton);
                 window.draw(gameUI.rematchText);
                 window.draw(gameUI.rematchAttemptText);
-                    drawBoard(600.f, me.board, 10, &gameUI);
+                drawBoard(600.f, me.board, 10, &gameUI);
+
                     for (int k = 0; k < 5; k++) {
                         me.shipShapes[k].setPosition({600.f + me.ships[k].col * 60.f,
                             150.f + me.ships[k].row * 60.f});
@@ -700,7 +699,7 @@ int main() {
                     }
                     if (me.playAgain && me.opponentPlayAgain) {
                         clicked = false;
-                        opponentIsReady = false;
+                        me.opponentIsReady = false;
                         resetPlayerData(me, &gameUI, connectionType);
                         currentScreen = PLACING_SHIPS;
                     }
