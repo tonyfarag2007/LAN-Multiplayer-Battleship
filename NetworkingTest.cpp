@@ -37,6 +37,13 @@ public:
 class UI {
 public:
     sf::Text ipInputText{font};
+    sf::Text serverButtonText{font, "Server"};
+    sf::RectangleShape clientButton{{250.f, 100.f}};
+    sf::Text clientButtonText{font, "Client"};
+    sf::Text connectingPrompt{font, "Host or join a game?"};
+    sf::Text ipPrompt{font, "Enter host IP, then press Enter:"};
+    sf::Text ip{font};
+    sf::Text waitingTest{font, "Waiting for a client to connect..."};
     sf::RectangleShape instructionBorder{{450.f, 450.f}};
     sf::Text instructionText{font, "INSTRUCTIONS"};
     std::vector<std::string> instructions;
@@ -60,6 +67,14 @@ public:
     sf::RectangleShape playAgainButton{{200.f, 100.f}};
     UI() {
         ipInputText.setPosition({700.f, 400.f});
+        serverButtonText.setPosition({770.f, 430.f});
+        clientButton.setPosition({1000.f, 400.f});
+        clientButton.setFillColor(sf::Color::Blue);
+        clientButtonText.setPosition({1070.f, 430.f});
+        connectingPrompt.setPosition({800.f, 300.f});
+        ipPrompt.setPosition({700.f, 300.f});
+        ip.setPosition({750.f, 500.f});
+        waitingTest.setPosition({700.f, 400.f});
         instructionBorder.setPosition({50.f, 250.f});
         instructionBorder.setFillColor(sf::Color::Red);
         instructionText.setPosition({170.f, 280.f});
@@ -380,36 +395,13 @@ int main() {
     Screen currentScreen = CONNECTING;
     char connectionType = 0;
     std::string hostIpInput;
-    bool awaitingIpInput = false;
-
-    sf::Text serverButtonText(font, "Server");
-    serverButtonText.setPosition({770.f, 430.f});
-
-    sf::RectangleShape clientButton({250.f, 100.f});
-    clientButton.setPosition({1000.f, 400.f});
-    clientButton.setFillColor(sf::Color::Blue);
-
-    sf::Text clientButtonText(font, "Client");
-    clientButtonText.setPosition({1070.f, 430.f});
-
-    sf::Text connectingPrompt(font, "Host or join a game?");
-    connectingPrompt.setPosition({800.f, 300.f});
-
-    sf::Text ipPrompt(font, "Enter host IP, then press Enter:");
-    ipPrompt.setPosition({700.f, 300.f});
+    bool awaitingIpInput = false, clicked = false;
 
     sf::Text connectionErrorText(font);
     connectionErrorText.setFillColor(sf::Color::Red);
 
     std::optional<sf::IpAddress> myIp = sf::IpAddress::getLocalAddress();
-
-    sf::Text ip(font, "Hosting on: " + myIp->toString());
-    ip.setPosition({750.f, 500.f});
-
-    sf::Text waitingText(font, "Waiting for a client to connect...");
-    waitingText.setPosition({700.f, 400.f});
-
-    bool clicked = false;
+    gameUI.ip.setString("Hosting on: " + myIp->toString());
 
     initializePlayerAssets(me);
     sf::TcpSocket socket; sf::TcpListener listener;
@@ -453,15 +445,15 @@ int main() {
             window.clear();
             if (currentScreen == CONNECTING) {
                 if (!awaitingIpInput) {
-                    window.draw(connectingPrompt);
+                    window.draw(gameUI.connectingPrompt);
                     gameUI.serverButton.setFillColor(gameUI.serverButton.getGlobalBounds().contains(mousePosition) ?
                         sf::Color::Green : sf::Color::Blue);
-                    clientButton.setFillColor(clientButton.getGlobalBounds().contains(mousePosition) ?
+                    gameUI.clientButton.setFillColor(gameUI.clientButton.getGlobalBounds().contains(mousePosition) ?
                         sf::Color::Green : sf::Color::Blue);
                     window.draw(gameUI.serverButton);
-                    window.draw(serverButtonText);
-                    window.draw(clientButton);
-                    window.draw(clientButtonText);
+                    window.draw(gameUI.serverButtonText);
+                    window.draw(gameUI.clientButton);
+                    window.draw(gameUI.clientButtonText);
 
                     static bool wasClicked = false;
                     bool isClickedNow = sf::Mouse::isButtonPressed(sf::Mouse::Button::Left);
@@ -472,22 +464,22 @@ int main() {
                         startHosting(listener);
                         currentScreen = WAITING_FOR_CLIENT;
                     }
-                    else if (clickedThisFrame && clientButton.getGlobalBounds().contains(mousePosition)) {
+                    else if (clickedThisFrame && gameUI.clientButton.getGlobalBounds().contains(mousePosition)) {
                         connectionType = 'c'; me.myName = "Player 2"; me.opponentName = "Player 1"; me.myTurn = false;
                         awaitingIpInput = true;
                     }
                     wasClicked = isClickedNow;
                 }
                 else {
-                    window.draw(ipPrompt);
+                    window.draw(gameUI.ipPrompt);
                     gameUI.ipInputText.setString(hostIpInput);
                     window.draw(gameUI.ipInputText);
                     window.draw(connectionErrorText);
                 }
             }
             else if (currentScreen == WAITING_FOR_CLIENT) {
-                 window.draw(waitingText);
-                 window.draw(ip);
+                 window.draw(gameUI.waitingTest);
+                 window.draw(gameUI.ip);
                  sf::Socket::Status status = tryAccept(listener, socket);
                  if (status == sf::Socket::Status::Done) {
                      currentScreen = PLACING_SHIPS;
