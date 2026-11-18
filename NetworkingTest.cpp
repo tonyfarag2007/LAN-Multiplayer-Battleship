@@ -55,6 +55,8 @@ public:
     sf::Text placeShipsText{font, "Place ships"};
     sf::Text playerLabel{font, "Player"};
     sf::Text battleText{font, "Battle!"};
+    sf::Text coordinatesCol{font};
+    sf::Text coordinatesRow{font};
     sf::Text attackFeedback{font};
     sf::Text turnFeedback{font, ""};
     sf::Text shipSunk{font};
@@ -101,7 +103,7 @@ public:
         playAgainButton.setPosition({800.f, 840.f});
         rematchText.setPosition({830.f, 870.f});
         disconnectedText.setPosition({730.f, 100.f});
-        gameOver.setPosition({730.f, 100.f});
+        gameOver.setPosition({730.f, 35.f});
         serverButton.setFillColor(sf::Color::Blue);
         verGridLine.setFillColor(sf::Color::Black);
         horGridLine.setFillColor(sf::Color::Black);
@@ -144,8 +146,19 @@ std::vector<std::vector<std::pair<int, int>>> storeShipLocations(Ship ships[], i
     return shipLocations;
     }
 void drawBoard(float boardOffset, sf::RectangleShape board[][10], int rows, UI *ui) {
+    char coordinateRow = 'A', coordinateCol = '0';
     for (int i = 0; i < rows; i++) {
         for (int j = 0; j < 10; j++) {
+            // print coordinates once, then never again
+            if (i == 0) {
+                gameUI.coordinatesRow.setString(coordinateRow);
+                gameUI.coordinatesRow.setPosition({boardOffset - 40.f + i * 60.f, 165.f + j * 60.f});
+                gameUI.coordinatesCol.setString(coordinateCol);
+                gameUI.coordinatesCol.setPosition({boardOffset + 20.f + j * 60.f, 105.f + i * 60.f});
+                window.draw(gameUI.coordinatesCol);
+                window.draw(gameUI.coordinatesRow);
+                coordinateCol += 1; coordinateRow += 1;
+            }
             board[i][j].setPosition({boardOffset + j * 60.f, 150.f + i * 60.f });
             window.draw(board[i][j]);
         }
@@ -289,7 +302,7 @@ std::pair<int, int> attack(Player& player) {
                                 player.trackingBoard[i][j].setFillColor(sf::Color::Yellow);
                                 if(leftPressedNow) {
                                     sf::Vector2f hitLocation(mousePosition);
-                                    colHit = static_cast<int>((hitLocation.x - 1120.f)/60.f);
+                                    colHit = static_cast<int>((hitLocation.x - 1160.f)/60.f);
                                     rowHit = static_cast<int>((hitLocation.y - 150.f)/60.f);
                                 }
                             }
@@ -544,15 +557,15 @@ int main() {
             }
             else if (currentScreen == BATTLESHIP) {
                     gameUI.playerLabel.setPosition({910.f, 800.f});
-                    drawBoard(200.f, me.board, 10, &gameUI);
-                    drawBoard(1120.f, me.trackingBoard, 10, &gameUI);
+                    drawBoard(160.f, me.board, 10, &gameUI);
+                    drawBoard(1160.f, me.trackingBoard, 10, &gameUI);
                     window.draw(gameUI.battleText);
                     window.draw(gameUI.playerLabel);
                     window.draw(gameUI.attackFeedback);
                     window.draw(gameUI.turnFeedback);
                     window.draw(gameUI.shipSunk);
                     for (int i = 0; i < 5; i++) {
-                        me.shipShapes[i].setPosition({(600.f + me.ships[i].col * 60.f) - 400.f,
+                        me.shipShapes[i].setPosition({(600.f + me.ships[i].col * 60.f) - 440.f,
                             150.f + me.ships[i].row * 60.f});
                         window.draw(me.shipShapes[i]);
                     }
@@ -572,15 +585,15 @@ int main() {
                                 sf::Packet isHit;
                                 bool hitResult = handleOpponentAttack(me, rowHit, colHit);
                                 gameUI.shipSunk.setString("");
-                                gameUI.attackFeedback.setPosition({850.f, 400.f});
+                                gameUI.attackFeedback.setPosition({825.f, 400.f});
                                 if (hitResult) {
-                                    std::string attackCoordinate = "Opponent Attack: \n Hit! " +
-                                        std::to_string(rowHit+1) + ":" + std::to_string(colHit+1);
+                                    std::string attackCoordinate = std::string("Opponent Attack: \n Hit! ") +
+                                        static_cast<char>(rowHit + 65) + ":" + std::to_string(colHit);
                                     gameUI.attackFeedback.setString(attackCoordinate);
                                 }
                                 else if (!hitResult) {
-                                    std::string attackCoordinate = "Opponent Attack: \n Miss! " +
-                                        std::to_string(rowHit+1) + ":" + std::to_string(colHit+1);
+                                    std::string attackCoordinate = std::string("Opponent Attack: \n Miss! ") +
+                                        static_cast<char>(rowHit + 65) + ":" + std::to_string(colHit);
                                     gameUI.attackFeedback.setString(attackCoordinate);
                                     me.myTurn = true;
                                 }
@@ -591,7 +604,7 @@ int main() {
                                     sf::Packet sunkShipPacket;
                                     message = SUNK_SHIP;
                                     gameUI.shipSunk.setString( me.opponentName + " sunk your \n ship!");
-                                    gameUI.shipSunk.setPosition({840.f, 250.f});
+                                    gameUI.shipSunk.setPosition({820.f, 250.f});
                                     sunkShipPacket << message << static_cast<int>(sunkShip->size());
                                     for (const auto& location : *sunkShip) {
                                         sunkShipPacket << location.first << location.second;
@@ -605,10 +618,10 @@ int main() {
                                 int rowHit, colHit;
                                 incoming >> isHit >> rowHit >> colHit;
                                 if (isHit) {
-                                    std::string attackCoordinate = "Hit! " + std::to_string(rowHit+1)
-                                    + ":" + std::to_string(colHit+1);
+                                    std::string attackCoordinate = std::string("Hit! ") + static_cast<char>(rowHit + 65)
+                                    + ":" + std::to_string(colHit);
                                     gameUI.shipSunk.setString("");
-                                    gameUI.attackFeedback.setPosition({900.f, 400.f});
+                                    gameUI.attackFeedback.setPosition({880.f, 400.f});
                                     gameUI.attackFeedback.setString(attackCoordinate);
                                     me.hitCount++;
                                     me.trackingBoard[rowHit][colHit].setFillColor(sf::Color::Red);
@@ -621,9 +634,9 @@ int main() {
                                     }
                                 }
                                 else if (!isHit) {
-                                    gameUI.attackFeedback.setPosition({900.f, 400.f});
-                                    std::string attackCoordinate = "Miss! " + std::to_string(rowHit+1)
-                                    + ":" + std::to_string(colHit+1);
+                                    gameUI.attackFeedback.setPosition({880.f, 400.f});
+                                    std::string attackCoordinate = std::string("Miss! ") + static_cast<char>(rowHit + 65)
+                                    + ":" + std::to_string(colHit);
                                     gameUI.shipSunk.setString("");
                                     gameUI.attackFeedback.setString(attackCoordinate);
                                     me.trackingBoard[rowHit][colHit].setFillColor(customWhite);
@@ -637,7 +650,7 @@ int main() {
                                 incoming >> row >> col;
                                 me.trackingBoard[row][col].setFillColor(sf::Color::Cyan);
                                 gameUI.shipSunk.setString("Ship sunk!");
-                                gameUI.shipSunk.setPosition({900.f, 300.f});
+                                gameUI.shipSunk.setPosition({880.f, 300.f});
                             }
                         }
                             else if (message == GAME_END) {
@@ -646,7 +659,7 @@ int main() {
                             }
                         }
                     if (me.myTurn) {
-                        gameUI.turnFeedback.setPosition({900.f, 350.f});
+                        gameUI.turnFeedback.setPosition({880.f, 350.f});
                         gameUI.turnFeedback.setString("Your turn");
                         std::pair<int, int> hitPair = attack(me);
                         if (hitPair.first != -1 && hitPair.second != -1) {
@@ -657,7 +670,7 @@ int main() {
                     }
                 else {
                     gameUI.turnFeedback.setString(me.opponentName + "'s Turn");
-                    gameUI.turnFeedback.setPosition({870.f, 350.f});
+                    gameUI.turnFeedback.setPosition({850.f, 350.f});
                 }
             }
             else if (currentScreen == GAME_OVER) {
