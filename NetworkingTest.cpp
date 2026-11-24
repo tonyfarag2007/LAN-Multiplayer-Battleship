@@ -1,9 +1,15 @@
 #include <SFML/Network.hpp>
-#include <iostream>
 #include <SFML/Graphics/RenderWindow.hpp>
 #include <SFML/Window/VideoMode.hpp>
 #include <SFML/Graphics.hpp>
+#include <cmath>
 #include "Network.h"
+
+#define INITIAL_BOARD_OFFSET_X 600.f
+#define BOARD_LENGTH 600.f
+#define CELL_LENGTH 60.f
+#define INITIAL_BOARD_OFFSET_Y 150.f
+
 sf::RenderWindow window(sf::VideoMode({1920, 1080}),
     "Battleship", sf::Style::Titlebar | sf::Style::Close);
 sf::Font font("AsapSharp.ttf");
@@ -17,6 +23,19 @@ public:
     bool sunkReported = false;
     sf::Vector2f dragOffset;
 };
+class xMark {
+public:
+    sf::RectangleShape xShape[2];
+    xMark() {
+        xShape[0].setSize({std::sqrt(2.f * 60.f * 60.f), 5.f});
+        xShape[0].setFillColor(sf::Color::Magenta);
+        xShape[0].setRotation(sf::degrees(45));
+        xShape[1].setSize({std::sqrt(2.f * 60.f * 60.f), 5.f});
+        xShape[1].setFillColor(sf::Color::Magenta);
+        xShape[1].setOrigin({std::sqrt(2.f * 60.f * 60.f), 0.f});
+        xShape[1].setRotation(sf::degrees(315));
+    }
+};
 class Player {
 public:
     Ship ships[5] = {
@@ -27,7 +46,11 @@ public:
         {1, 0, 0, 0, true}
     };
     sf::RectangleShape board[10][10], trackingBoard[10][10], shipShapes[5];
+    bool cellHit[10][10] = {false};
     std::vector<std::vector<std::pair<int, int>>> shipLocations;
+    std::vector<xMark> trackingBoardMarkerLocations;
+    std::vector<xMark> boardMarkerLocations;
+    std::vector<xMark> gameOverBoardMarkerLocations;
     std::string myName, opponentName;
     int hitCount = 0;
     bool myTurn = false;
@@ -64,6 +87,7 @@ public:
     sf::Text rematchAttemptText{font};
     sf::Text disconnectedText{font, "Opponent disconnected!"};
     sf::Text gameOver{font};
+    sf::RectangleShape xMarker[2];
     sf::RectangleShape verGridLine{{1.f, 600.f}};
     sf::RectangleShape horGridLine{{600.f, 1.f}};
     sf::RectangleShape playAgainButton{{200.f, 100.f}};
@@ -159,17 +183,41 @@ void drawBoard(float boardOffset, sf::RectangleShape board[][10], int rows, UI *
                 window.draw(gameUI.coordinatesRow);
                 coordinateCol += 1; coordinateRow += 1;
             }
-            board[i][j].setPosition({boardOffset + j * 60.f, 150.f + i * 60.f });
+            board[i][j].setPosition({boardOffset + j * CELL_LENGTH, INITIAL_BOARD_OFFSET_Y + i * CELL_LENGTH});
             window.draw(board[i][j]);
         }
     }
     for (int i = 0; i <= 10; i++) {
-        ui->verGridLine.setPosition({boardOffset + i * 60.f, 150.f});
-        ui->horGridLine.setPosition({boardOffset, 150.f + i * 60.f});
+        ui->verGridLine.setPosition({boardOffset + i * 60.f, INITIAL_BOARD_OFFSET_Y});
+        ui->horGridLine.setPosition({boardOffset, INITIAL_BOARD_OFFSET_Y + i * CELL_LENGTH});
         window.draw(ui->horGridLine);
         window.draw(ui->verGridLine);
     }
 }
+void storeMarker(Player &player, int row, int col, bool isTrackingBoard) {
+    xMark xTrackingBoard, xGameOverBoard;
+    if (isTrackingBoard) {
+        xTrackingBoard.xShape[0].setPosition(player.trackingBoard[row][col].getPosition());
+        xTrackingBoard.xShape[1].setPosition(player.trackingBoard[row][col].getPosition() + sf::Vector2f{60.f, 0.f});
+        player.trackingBoardMarkerLocations.push_back(xTrackingBoard);
+    }
+    else {
+        xTrackingBoard.xShape[0].setPosition(player.board[row][col].getPosition());
+        xTrackingBoard.xShape[1].setPosition(player.board[row][col].getPosition() + sf::Vector2f{60.f, 0.f});
+
+        xGameOverBoard.xShape[0].setPosition(player.board[row][col].getPosition() + sf::Vector2f(440.f, 0.f));
+        xGameOverBoard.xShape[1].setPosition(player.board[row][col].getPosition() + sf::Vector2f(500.f, 0.f));
+        player.boardMarkerLocations.push_back(xTrackingBoard);
+        player.gameOverBoardMarkerLocations.push_back(xGameOverBoard);
+    }
+}
+void drawMarkers(std::vector<xMark>& markerLocations) {
+    if (markerLocations.empty()) return;
+        for (const xMark &X : markerLocations) {
+            window.draw(X.xShape[0]);
+            window.draw(X.xShape[1]);
+        }
+    }
 void initializePlayerAssets(Player& player) {
     for (int i = 0; i < 5; i++) {
         player.shipShapes[i].setSize({60.f, player.ships[i].length * 60.f});
@@ -266,12 +314,13 @@ bool placeShips(Player& player) {
                 for (int i = 0; i < 5; i++) {
                     if (player.ships[i].isDragged) {
                         sf::Vector2f pos = player.shipShapes[i].getPosition();
-                        bool insideBoard = (pos.x >= 600.f && pos.x <= 1200.f && pos.y >= 150.f && pos.y <= 750.f);
+                        bool insideBoard = (pos.x >= INITIAL_BOARD_OFFSET_X && pos.x <= 2 * BOARD_LENGTH
+                            && pos.y >= INITIAL_BOARD_OFFSET_Y && pos.y <= INITIAL_BOARD_OFFSET_Y + BOARD_LENGTH);
                         if (insideBoard) {
-                            player.ships[i].col = static_cast<int>((pos.x - 600.f) / 60.f);
-                            player.ships[i].row = static_cast<int>((pos.y - 150.f) / 60.f);
-                            player.shipShapes[i].setPosition({600.f + player.ships[i].col * 60.f,
-                                150.f + player.ships[i].row * 60.f});
+                            player.ships[i].col = static_cast<int>((pos.x - INITIAL_BOARD_OFFSET_X) / CELL_LENGTH);
+                            player.ships[i].row = static_cast<int>((pos.y - INITIAL_BOARD_OFFSET_Y) / CELL_LENGTH);
+                            player.shipShapes[i].setPosition({INITIAL_BOARD_OFFSET_X + player.ships[i].col * CELL_LENGTH,
+                                INITIAL_BOARD_OFFSET_Y + player.ships[i].row * CELL_LENGTH});
                             player.ships[i].isPlaced = true;
                         }
                     }
@@ -302,8 +351,8 @@ std::pair<int, int> attack(Player& player) {
                                 player.trackingBoard[i][j].setFillColor(sf::Color::Yellow);
                                 if(leftPressedNow) {
                                     sf::Vector2f hitLocation(mousePosition);
-                                    colHit = static_cast<int>((hitLocation.x - 1160.f)/60.f);
-                                    rowHit = static_cast<int>((hitLocation.y - 150.f)/60.f);
+                                    colHit = static_cast<int>((hitLocation.x - 1160.f)/CELL_LENGTH);
+                                    rowHit = static_cast<int>((hitLocation.y - INITIAL_BOARD_OFFSET_Y)/CELL_LENGTH);
                                 }
                             }
                             else if (!player.trackingBoard[i][j].getGlobalBounds().contains(mousePosition)
@@ -352,6 +401,7 @@ void resetPlayerData(Player& player, UI *ui, char connectionType) {
         for (int j = 0; j<10; j++) {
             player.board[i][j].setFillColor(sf::Color::Blue);
             player.trackingBoard[i][j].setFillColor(sf::Color::Blue);
+            player.cellHit[i][j] = false;
         }
     }
     for (int i = 0; i < 5; i++) {
@@ -366,6 +416,8 @@ void resetPlayerData(Player& player, UI *ui, char connectionType) {
         player.isReady = false;
         player.playAgain = false;
         player.shipLocations.clear();
+        player.trackingBoardMarkerLocations.clear();
+        player.boardMarkerLocations.clear();
     }
     connectionType == 's'? player.myTurn = true: player.myTurn = false;
     player.opponentPlayAgain = false;
@@ -559,6 +611,7 @@ int main() {
                     gameUI.playerLabel.setPosition({910.f, 800.f});
                     drawBoard(160.f, me.board, 10, &gameUI);
                     drawBoard(1160.f, me.trackingBoard, 10, &gameUI);
+                    drawMarkers(me.trackingBoardMarkerLocations);
                     window.draw(gameUI.battleText);
                     window.draw(gameUI.playerLabel);
                     window.draw(gameUI.attackFeedback);
@@ -589,6 +642,7 @@ int main() {
                                 if (hitResult) {
                                     std::string attackCoordinate = std::string("Opponent Attack: \n Hit! ") +
                                         static_cast<char>(rowHit + 65) + ":" + std::to_string(colHit);
+                                    storeMarker(me, rowHit, colHit, false);
                                     gameUI.attackFeedback.setString(attackCoordinate);
                                 }
                                 else if (!hitResult) {
@@ -625,6 +679,8 @@ int main() {
                                     gameUI.attackFeedback.setString(attackCoordinate);
                                     me.hitCount++;
                                     me.trackingBoard[rowHit][colHit].setFillColor(sf::Color::Red);
+                                    me.cellHit[rowHit][colHit] = true;
+                                    storeMarker(me, rowHit, colHit, true);
                                     if (playerWins(me)) {
                                         gameUI.gameOver.setString("Game Over! " + me.myName + " won!");
                                         currentScreen = GAME_OVER;
@@ -680,6 +736,7 @@ int main() {
                 window.draw(gameUI.rematchText);
                 window.draw(gameUI.rematchAttemptText);
                 drawBoard(600.f, me.board, 10, &gameUI);
+                drawMarkers(me.gameOverBoardMarkerLocations);
 
                     for (int k = 0; k < 5; k++) {
                         me.shipShapes[k].setPosition({600.f + me.ships[k].col * 60.f,
@@ -699,9 +756,13 @@ int main() {
                         gameUI.playAgainButton.setFillColor(sf::Color::Red);
                     }
                     sf::Packet ready;
-                    if (socket.receive(ready) == sf::Socket::Status::Done) {
+                sf::Socket::Status status = socket.receive(ready);
+                    if (status == sf::Socket::Status::Done) {
                         ready >> me.opponentPlayAgain;
                     }
+                else if (status == sf::Socket::Status::Disconnected) {
+                    currentScreen = DISCONNECTED;
+                }
                     if (me.playAgain && me.opponentPlayAgain) {
                         clicked = false;
                         me.opponentIsReady = false;
