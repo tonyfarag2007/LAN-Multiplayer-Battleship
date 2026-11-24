@@ -23,16 +23,16 @@ public:
     bool sunkReported = false;
     sf::Vector2f dragOffset;
 };
-class xMark {
+class HitMark {
 public:
     sf::RectangleShape xShape[2];
-    xMark() {
-        xShape[0].setSize({std::sqrt(2.f * 60.f * 60.f), 5.f});
+    HitMark() {
+        xShape[0].setSize({std::sqrt(2.f * CELL_LENGTH * CELL_LENGTH), 5.f});
         xShape[0].setFillColor(sf::Color::Magenta);
         xShape[0].setRotation(sf::degrees(45));
-        xShape[1].setSize({std::sqrt(2.f * 60.f * 60.f), 5.f});
+        xShape[1].setSize({std::sqrt(2.f * CELL_LENGTH * CELL_LENGTH), 5.f});
         xShape[1].setFillColor(sf::Color::Magenta);
-        xShape[1].setOrigin({std::sqrt(2.f * 60.f * 60.f), 0.f});
+        xShape[1].setOrigin({std::sqrt(2.f * CELL_LENGTH * CELL_LENGTH), 0.f});
         xShape[1].setRotation(sf::degrees(315));
     }
 };
@@ -46,11 +46,14 @@ public:
         {1, 0, 0, 0, true}
     };
     sf::RectangleShape board[10][10], trackingBoard[10][10], shipShapes[5];
-    bool cellHit[10][10] = {false};
+    bool cellAttacked[10][10] = {false};
+
     std::vector<std::vector<std::pair<int, int>>> shipLocations;
-    std::vector<xMark> trackingBoardMarkerLocations;
-    std::vector<xMark> boardMarkerLocations;
-    std::vector<xMark> gameOverBoardMarkerLocations;
+
+    std::vector<HitMark> trackingHitMarkLocations;
+    std::vector<HitMark> hitMarkLocations;
+    std::vector<HitMark> gameOverHitMarkLocations;
+
     std::string myName, opponentName;
     int hitCount = 0;
     bool myTurn = false;
@@ -176,9 +179,9 @@ void drawBoard(float boardOffset, sf::RectangleShape board[][10], int rows, UI *
             // print coordinates once, then never again
             if (i == 0) {
                 gameUI.coordinatesRow.setString(coordinateRow);
-                gameUI.coordinatesRow.setPosition({boardOffset - 40.f + i * 60.f, 165.f + j * 60.f});
+                gameUI.coordinatesRow.setPosition({boardOffset - 40.f + i * CELL_LENGTH, 165.f + j * CELL_LENGTH});
                 gameUI.coordinatesCol.setString(coordinateCol);
-                gameUI.coordinatesCol.setPosition({boardOffset + 20.f + j * 60.f, 105.f + i * 60.f});
+                gameUI.coordinatesCol.setPosition({boardOffset + 20.f + j * CELL_LENGTH, 105.f + i * CELL_LENGTH});
                 window.draw(gameUI.coordinatesCol);
                 window.draw(gameUI.coordinatesRow);
                 coordinateCol += 1; coordinateRow += 1;
@@ -188,18 +191,18 @@ void drawBoard(float boardOffset, sf::RectangleShape board[][10], int rows, UI *
         }
     }
     for (int i = 0; i <= 10; i++) {
-        ui->verGridLine.setPosition({boardOffset + i * 60.f, INITIAL_BOARD_OFFSET_Y});
+        ui->verGridLine.setPosition({boardOffset + i * CELL_LENGTH, INITIAL_BOARD_OFFSET_Y});
         ui->horGridLine.setPosition({boardOffset, INITIAL_BOARD_OFFSET_Y + i * CELL_LENGTH});
         window.draw(ui->horGridLine);
         window.draw(ui->verGridLine);
     }
 }
 void storeMarker(Player &player, int row, int col, bool isTrackingBoard) {
-    xMark xTrackingBoard, xGameOverBoard;
+    HitMark xTrackingBoard, xGameOverBoard;
     if (isTrackingBoard) {
         xTrackingBoard.xShape[0].setPosition(player.trackingBoard[row][col].getPosition());
         xTrackingBoard.xShape[1].setPosition(player.trackingBoard[row][col].getPosition() + sf::Vector2f{60.f, 0.f});
-        player.trackingBoardMarkerLocations.push_back(xTrackingBoard);
+        player.trackingHitMarkLocations.push_back(xTrackingBoard);
     }
     else {
         xTrackingBoard.xShape[0].setPosition(player.board[row][col].getPosition());
@@ -207,20 +210,20 @@ void storeMarker(Player &player, int row, int col, bool isTrackingBoard) {
 
         xGameOverBoard.xShape[0].setPosition(player.board[row][col].getPosition() + sf::Vector2f(440.f, 0.f));
         xGameOverBoard.xShape[1].setPosition(player.board[row][col].getPosition() + sf::Vector2f(500.f, 0.f));
-        player.boardMarkerLocations.push_back(xTrackingBoard);
-        player.gameOverBoardMarkerLocations.push_back(xGameOverBoard);
+        player.hitMarkLocations.push_back(xTrackingBoard);
+        player.gameOverHitMarkLocations.push_back(xGameOverBoard);
     }
 }
-void drawMarkers(std::vector<xMark>& markerLocations) {
+void drawMarkers(std::vector<HitMark>& markerLocations) {
     if (markerLocations.empty()) return;
-        for (const xMark &X : markerLocations) {
+        for (const HitMark &X : markerLocations) {
             window.draw(X.xShape[0]);
             window.draw(X.xShape[1]);
         }
     }
 void initializePlayerAssets(Player& player) {
     for (int i = 0; i < 5; i++) {
-        player.shipShapes[i].setSize({60.f, player.ships[i].length * 60.f});
+        player.shipShapes[i].setSize({CELL_LENGTH, player.ships[i].length * CELL_LENGTH});
     }
     player.shipShapes[0].setPosition({1620.f, 180.f});
     player.shipShapes[1].setPosition({1720.f, 180.f});
@@ -230,14 +233,14 @@ void initializePlayerAssets(Player& player) {
 
     for (int i = 0; i < 10; i++) {
         for (int j = 0; j < 10; j++) {
-            player.board[i][j].setSize({60.f, 60.f});
-            player.board[i][j].setPosition({600.f + j * 60.f, 150.f + i * 60.f});
+            player.board[i][j].setSize({CELL_LENGTH, CELL_LENGTH});
+            player.board[i][j].setPosition({INITIAL_BOARD_OFFSET_X + j * CELL_LENGTH, INITIAL_BOARD_OFFSET_Y + i * CELL_LENGTH});
             player.board[i][j].setFillColor(sf::Color::Blue);
             player.board[i][j].setOutlineColor(sf::Color::Black);
             player.board[i][j].setOutlineThickness(0.f);
 
-            player.trackingBoard[i][j].setSize({60.f, 60.f});
-            player.trackingBoard[i][j].setPosition({1120.f + j * 60.f, 150.f + i * 60.f});
+            player.trackingBoard[i][j].setSize({CELL_LENGTH, CELL_LENGTH});
+            player.trackingBoard[i][j].setPosition({1120.f + j * CELL_LENGTH, INITIAL_BOARD_OFFSET_Y + i * CELL_LENGTH});
             player.trackingBoard[i][j].setFillColor(sf::Color::Blue);
             player.trackingBoard[i][j].setOutlineColor(sf::Color::Black);
             player.trackingBoard[i][j].setOutlineThickness(0.f);
@@ -286,10 +289,10 @@ bool placeShips(Player& player) {
                     if (player.shipShapes[i].getGlobalBounds().contains(mousePosition)) {
                         player.ships[i].isVertical = !player.ships[i].isVertical;
                         if (!player.ships[i].isVertical) {
-                            player.shipShapes[i].setSize({player.ships[i].length * 60.f, 60.f});
+                            player.shipShapes[i].setSize({player.ships[i].length * CELL_LENGTH, CELL_LENGTH});
                         }
                         else {
-                            player.shipShapes[i].setSize({60.f, player.ships[i].length * 60.f});
+                            player.shipShapes[i].setSize({CELL_LENGTH, player.ships[i].length * CELL_LENGTH});
                         }
                         break;
                     }
@@ -344,15 +347,12 @@ std::pair<int, int> attack(Player& player) {
     bool leftPressedNow = leftDown && !wasLeftDown;
                 for (int i = 0; i<10; i++) {
                     for (int j = 0; j<10; j++) {
-                            if (player.trackingBoard[i][j].getGlobalBounds().contains(mousePosition) &&
-                                player.trackingBoard[i][j].getFillColor() != sf::Color::Red &&
-                                player.trackingBoard[i][j].getFillColor() != customWhite &&
-                                player.trackingBoard[i][j].getFillColor() != sf::Color::Cyan) {
+                            if (player.trackingBoard[i][j].getGlobalBounds().contains(mousePosition)
+                                && !player.cellAttacked[i][j]) {
                                 player.trackingBoard[i][j].setFillColor(sf::Color::Yellow);
                                 if(leftPressedNow) {
-                                    sf::Vector2f hitLocation(mousePosition);
-                                    colHit = static_cast<int>((hitLocation.x - 1160.f)/CELL_LENGTH);
-                                    rowHit = static_cast<int>((hitLocation.y - INITIAL_BOARD_OFFSET_Y)/CELL_LENGTH);
+                                    rowHit = i;
+                                    colHit = j;
                                 }
                             }
                             else if (!player.trackingBoard[i][j].getGlobalBounds().contains(mousePosition)
@@ -401,11 +401,11 @@ void resetPlayerData(Player& player, UI *ui, char connectionType) {
         for (int j = 0; j<10; j++) {
             player.board[i][j].setFillColor(sf::Color::Blue);
             player.trackingBoard[i][j].setFillColor(sf::Color::Blue);
-            player.cellHit[i][j] = false;
+            player.cellAttacked[i][j] = false;
         }
     }
     for (int i = 0; i < 5; i++) {
-        player.shipShapes[i].setSize({60.f, player.ships[i].length * 60.f});
+        player.shipShapes[i].setSize({60.f, player.ships[i].length * CELL_LENGTH});
         player.ships[i].cellsHit = 0;
         player.ships[i].sunkReported = false;
         player.ships[i].isPlaced = false;
@@ -416,8 +416,9 @@ void resetPlayerData(Player& player, UI *ui, char connectionType) {
         player.isReady = false;
         player.playAgain = false;
         player.shipLocations.clear();
-        player.trackingBoardMarkerLocations.clear();
-        player.boardMarkerLocations.clear();
+        player.trackingHitMarkLocations.clear();
+        player.hitMarkLocations.clear();
+        player.gameOverHitMarkLocations.clear();
     }
     connectionType == 's'? player.myTurn = true: player.myTurn = false;
     player.opponentPlayAgain = false;
@@ -611,7 +612,6 @@ int main() {
                     gameUI.playerLabel.setPosition({910.f, 800.f});
                     drawBoard(160.f, me.board, 10, &gameUI);
                     drawBoard(1160.f, me.trackingBoard, 10, &gameUI);
-                    drawMarkers(me.trackingBoardMarkerLocations);
                     window.draw(gameUI.battleText);
                     window.draw(gameUI.playerLabel);
                     window.draw(gameUI.attackFeedback);
@@ -622,6 +622,8 @@ int main() {
                             150.f + me.ships[i].row * 60.f});
                         window.draw(me.shipShapes[i]);
                     }
+                    drawMarkers(me.trackingHitMarkLocations);
+                    drawMarkers(me.hitMarkLocations);
                     sf::Packet incoming;
                     sf::Socket::Status status = socket.receive(incoming);
                     if (status == sf::Socket::Status::Disconnected) {
@@ -679,7 +681,7 @@ int main() {
                                     gameUI.attackFeedback.setString(attackCoordinate);
                                     me.hitCount++;
                                     me.trackingBoard[rowHit][colHit].setFillColor(sf::Color::Red);
-                                    me.cellHit[rowHit][colHit] = true;
+                                    me.cellAttacked[rowHit][colHit] = true;
                                     storeMarker(me, rowHit, colHit, true);
                                     if (playerWins(me)) {
                                         gameUI.gameOver.setString("Game Over! " + me.myName + " won!");
@@ -696,6 +698,7 @@ int main() {
                                     gameUI.shipSunk.setString("");
                                     gameUI.attackFeedback.setString(attackCoordinate);
                                     me.trackingBoard[rowHit][colHit].setFillColor(customWhite);
+                                    me.cellAttacked[rowHit][colHit] = true;
                                     me.myTurn = false;
                                 }
                             }
@@ -736,13 +739,13 @@ int main() {
                 window.draw(gameUI.rematchText);
                 window.draw(gameUI.rematchAttemptText);
                 drawBoard(600.f, me.board, 10, &gameUI);
-                drawMarkers(me.gameOverBoardMarkerLocations);
 
                     for (int k = 0; k < 5; k++) {
                         me.shipShapes[k].setPosition({600.f + me.ships[k].col * 60.f,
                             150.f + me.ships[k].row * 60.f});
                         window.draw(me.shipShapes[k]);
                     }
+                    drawMarkers(me.gameOverHitMarkLocations);
                     if (gameUI.playAgainButton.getGlobalBounds().contains(mousePosition)) {
                         gameUI.playAgainButton.setFillColor(sf::Color::Magenta);
                         if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left) && !me.playAgain) {
