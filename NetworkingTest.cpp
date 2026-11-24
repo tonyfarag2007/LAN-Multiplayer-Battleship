@@ -406,6 +406,7 @@ void resetPlayerData(Player& player, UI *ui, char connectionType) {
     }
     for (int i = 0; i < 5; i++) {
         player.shipShapes[i].setSize({60.f, player.ships[i].length * CELL_LENGTH});
+        player.shipShapes[i].setFillColor(sf::Color(0, 255, 0, 150));
         player.ships[i].cellsHit = 0;
         player.ships[i].sunkReported = false;
         player.ships[i].isPlaced = false;
@@ -664,7 +665,11 @@ int main() {
                                     sunkShipPacket << message << static_cast<int>(sunkShip->size());
                                     for (const auto& location : *sunkShip) {
                                         sunkShipPacket << location.first << location.second;
-                                        me.board[location.first][location.second].setFillColor(sf::Color::Black);
+                                    }
+                                    for (int i = 0; i < 5; i++) {
+                                        if (me.ships[i].length == me.ships[i].cellsHit) {
+                                            me.shipShapes[i].setFillColor(sf::Color(80, 75, 0, 255));
+                                        }
                                     }
                                     socket.send(sunkShipPacket);
                                 }
@@ -707,7 +712,7 @@ int main() {
                             incoming >> count;
                             for (int i = 0; i < count; i++) {
                                 incoming >> row >> col;
-                                me.trackingBoard[row][col].setFillColor(sf::Color::Cyan);
+                                me.trackingBoard[row][col].setFillColor(sf::Color(80, 75, 0, 255));
                                 gameUI.shipSunk.setString("Ship sunk!");
                                 gameUI.shipSunk.setPosition({880.f, 300.f});
                             }
