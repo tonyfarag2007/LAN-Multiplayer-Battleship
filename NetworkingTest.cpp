@@ -66,7 +66,7 @@ public:
     sf::Text connectionErrorText{font}; sf::Text ip{font};
     sf::Text playerIsReadyText{font}; sf::Text coordinatesCol{font};
     sf::Text coordinatesRow{font}; sf::Text attackFeedback{font};
-    sf::Text shipSunk{font}; sf::Text gameOver{font};
+    sf::Text shipSunk{font}; sf::Text gameOverText{font};
     sf::Text rematchAttemptText{font}; sf::Text ipInputText{font};
 
 
@@ -95,20 +95,23 @@ public:
     sf::RectangleShape playAgainButton{{200.f, 100.f}};
 
     std::vector<std::string> instructions;
+
     UI() {
         ipInputText.setPosition({700.f, 400.f});
         serverButtonText.setPosition({770.f, 430.f});
         clientButton.setPosition({1000.f, 400.f});
-        clientButton.setFillColor(sf::Color::Blue);
         clientButtonText.setPosition({1070.f, 430.f});
         connectingPrompt.setPosition({800.f, 300.f});
-        connectionErrorText.setFillColor(sf::Color::Red);
         ipPrompt.setPosition({700.f, 300.f});
         ip.setPosition({750.f, 500.f});
         waitingTest.setPosition({700.f, 400.f});
-        instructionBorder.setPosition({50.f, 250.f});
-        instructionBorder.setFillColor(sf::Color::Red);
         instructionText.setPosition({170.f, 280.f});
+        instructionBorder.setPosition({50.f, 250.f});
+
+        clientButton.setFillColor(sf::Color::Blue);
+        connectionErrorText.setFillColor(sf::Color::Red);
+        instructionBorder.setFillColor(sf::Color::Red);
+
         instructions = {
             "- Drag ships onto your board",
             "- Right-click a ship to rotate it",
@@ -117,6 +120,7 @@ public:
             "- Click ready when all ships",
             " are placed"
         };
+
         shipLoader.setPosition({1600.f, 160.f}); readyText.setPosition({1650.f, 775.f});
         playerIsReadyText.setPosition({150.f, 200.f}); readyButton.setPosition({1610.f, 750.f});
         readyButton.setFillColor(customWhite); serverButton.setPosition({700.f, 400.f});
@@ -124,7 +128,7 @@ public:
         battleText.setPosition({910.f, 30.f}); attackFeedback.setPosition({900.f, 400.f});
         turnFeedback.setPosition({900.f, 350.f}); shipSunk.setPosition({900.f, 300.f});
         playAgainButton.setPosition({800.f, 840.f}); rematchText.setPosition({830.f, 870.f});
-        disconnectedText.setPosition({730.f, 100.f}); gameOver.setPosition({730.f, 35.f});
+        disconnectedText.setPosition({730.f, 100.f}); gameOverText.setPosition({730.f, 35.f});
         serverButton.setFillColor(sf::Color::Blue); verGridLine.setFillColor(sf::Color::Black);
         horGridLine.setFillColor(sf::Color::Black); playAgainButton.setFillColor(sf::Color::Red);
     }
@@ -135,7 +139,7 @@ Player me; UI gameUI;
 
 enum Screen {
     CONNECTING, WAITING_FOR_CLIENT,
-    PLACING_SHIPS, BATTLESHIP,
+    PLACING_SHIPS, GAMEPLAY_LOOP,
     GAME_OVER, DISCONNECTED
 };
 enum MessageType {
@@ -362,6 +366,45 @@ bool handleOpponentAttack(Player& player, int rowHit, int colHit) {
     }
     return hitFound;
 }
+
+// player wins on 15 hits (5 + 4 + 3 + 2 + 1)
+bool playerWins(Player& player) {
+    return player.hitCount == 15;
+}
+
+void handleHitResult(Screen *currentScreen, sf::TcpSocket *socket,
+    Player& player, UI *ui, bool hitFound, int row, int col){
+
+    player.cellAttacked[row][col] = true;
+
+    if (hitFound) {
+        std::string attackCoordinate = std::string("Hit! ") + static_cast<char>(row + 65)
+        + ":" + std::to_string(col);
+        ui->shipSunk.setString("");
+        ui->attackFeedback.setPosition({880.f, 400.f});
+        ui->attackFeedback.setString(attackCoordinate);
+        player.hitCount++;
+        player.trackingBoard[row][col].setFillColor(sf::Color::Red);
+        storeMarker(player, row, col, true);
+        if (playerWins(player)) {
+            ui->gameOverText.setString("Game Over! " + player.myName + " won!");
+            *currentScreen = Screen::GAME_OVER;
+            sf::Packet winDetected;
+            winDetected << MessageType::GAME_END;
+            socket->send(winDetected);
+        }
+    }
+    else if (!hitFound) {
+        ui->attackFeedback.setPosition({880.f, 400.f});
+        std::string attackCoordinate = std::string("Miss! ") + static_cast<char>(row + 65)
+        + ":" + std::to_string(col);
+        ui->shipSunk.setString("");
+        ui->attackFeedback.setString(attackCoordinate);
+        player.trackingBoard[row][col].setFillColor(customWhite);
+        player.myTurn = false;
+    }
+
+}
 std::optional<std::vector<std::pair<int, int>>> handleSunkShip(Player& player) {
    for (int i = 0; i < 5; i++) {
            if (player.ships[i].cellsHit == player.ships[i].length) {
@@ -379,10 +422,6 @@ void revealSunkShip(sf::TcpSocket &socket, Player &player, sf::Packet sunkShipPa
         sunkShipPacket << location.first << location.second;
     }
     socket.send(sunkShipPacket);
-}
-// player wins on 15 hits (5 + 4 + 3 + 2 + 1)
-bool playerWins(Player& player) {
-    return player.hitCount == 15;
 }
 
 void resetPlayerData(Player& player, UI *ui, char connectionType) {
@@ -416,7 +455,7 @@ void resetPlayerData(Player& player, UI *ui, char connectionType) {
     ui->shipSunk.setPosition({900.f, 300.f});
 }
 
-void buildUI(Player& player, UI *gameUI) {
+void buildShipPlacementUI(Player& player, UI *gameUI) {
     gameUI->playerLabel.setString(player.myName);
     window.draw(gameUI->playerLabel);
     window.draw(gameUI->placeShipsText);
@@ -437,6 +476,24 @@ void buildUI(Player& player, UI *gameUI) {
     for (int i = 0; i < 5; i++) {
         window.draw(player.shipShapes[i]);
     }
+}
+
+void buildGameplayUI(Player& player, UI *ui) {
+    ui->playerLabel.setPosition({910.f, 800.f});
+    drawBoard(BATTLESHIP_BOARD_OFFSET, player.board, 10, ui);
+    drawBoard(BATTLESHIP_TRACKING_BOARD_OFFSET, player.trackingBoard, 10, ui);
+    window.draw(ui->battleText);
+    window.draw(ui->playerLabel);
+    window.draw(ui->attackFeedback);
+    window.draw(ui->turnFeedback);
+    window.draw(ui->shipSunk);
+    for (int i = 0; i < 5; i++) {
+        player.shipShapes[i].setPosition({(INITIAL_BOARD_OFFSET_X + player.ships[i].col *
+            CELL_LENGTH) - 440.f,
+            INITIAL_BOARD_OFFSET_Y + player.ships[i].row * CELL_LENGTH});
+        window.draw(player.shipShapes[i]);
+    }
+    drawMarkers(player.trackingHitMarkLocations); drawMarkers(player.hitMarkLocations);
 }
 
 int main() {
@@ -495,10 +552,8 @@ int main() {
                         sf::Color::Green : sf::Color::Blue);
                     gameUI.clientButton.setFillColor(gameUI.clientButton.getGlobalBounds().contains(mousePosition) ?
                         sf::Color::Green : sf::Color::Blue);
-                    window.draw(gameUI.serverButton);
-                    window.draw(gameUI.serverButtonText);
-                    window.draw(gameUI.clientButton);
-                    window.draw(gameUI.clientButtonText);
+                    window.draw(gameUI.serverButton); window.draw(gameUI.serverButtonText);
+                    window.draw(gameUI.clientButton); window.draw(gameUI.clientButtonText);
 
                     static bool wasClicked = false;
                     bool isClickedNow = sf::Mouse::isButtonPressed(sf::Mouse::Button::Left);
@@ -516,8 +571,8 @@ int main() {
                     wasClicked = isClickedNow;
                 }
                 else {
-                    window.draw(gameUI.ipPrompt);
                     gameUI.ipInputText.setString(hostIpInput);
+                    window.draw(gameUI.ipPrompt);
                     window.draw(gameUI.ipInputText);
                     window.draw(gameUI.connectionErrorText);
                 }
@@ -533,7 +588,7 @@ int main() {
             else if (currentScreen == Screen::PLACING_SHIPS) {
 
                 drawBoard(INITIAL_BOARD_OFFSET_X, me.board, 10, &gameUI);
-                buildUI(me, &gameUI);
+                buildShipPlacementUI(me, &gameUI);
 
                 // ship placement and location storing logic
                 if (placeShips(me)) {
@@ -568,6 +623,7 @@ int main() {
                 if (status == sf::Socket::Status::Disconnected) {
                     currentScreen = Screen::DISCONNECTED;
                 }
+
                 // confirms opponent is ready
                 if (status == sf::Socket::Status::Done) {
                         received >> me.opponentIsReady;
@@ -579,14 +635,16 @@ int main() {
                     gameUI.placeShipsText.setPosition({715.f, 800.f});
                     window.draw(gameUI.placeShipsText);
                 }
+
                 // player not ready but opponent ready case
                 if (!me.isReady && me.opponentIsReady) {
                     gameUI.playerIsReadyText.setString(me.opponentName +" is ready!");
                     window.draw(gameUI.playerIsReadyText);
                 }
+
                 // both players ready case
                 if (me.isReady && me.opponentIsReady) {
-                        currentScreen = Screen::BATTLESHIP;
+                        currentScreen = Screen::GAMEPLAY_LOOP;
                     }
 
                 // ship color decided on mouse position, custom colors used
@@ -597,26 +655,15 @@ int main() {
                         sf::Color(shipGreen));
                 }
             }
+
             // main gameplay loop
-            else if (currentScreen == Screen::BATTLESHIP) {
-                    gameUI.playerLabel.setPosition({910.f, 800.f});
-                    drawBoard(BATTLESHIP_BOARD_OFFSET, me.board, 10, &gameUI);
-                    drawBoard(BATTLESHIP_TRACKING_BOARD_OFFSET, me.trackingBoard, 10, &gameUI);
-                    window.draw(gameUI.battleText);
-                    window.draw(gameUI.playerLabel);
-                    window.draw(gameUI.attackFeedback);
-                    window.draw(gameUI.turnFeedback);
-                    window.draw(gameUI.shipSunk);
-                    for (int i = 0; i < 5; i++) {
-                        me.shipShapes[i].setPosition({(INITIAL_BOARD_OFFSET_X + me.ships[i].col *
-                            CELL_LENGTH) - 440.f,
-                            INITIAL_BOARD_OFFSET_Y + me.ships[i].row * CELL_LENGTH});
-                        window.draw(me.shipShapes[i]);
-                    }
-                    drawMarkers(me.trackingHitMarkLocations);
-                    drawMarkers(me.hitMarkLocations);
+            else if (currentScreen == Screen::GAMEPLAY_LOOP) {
+
+                buildGameplayUI(me, &gameUI);
+
                     sf::Packet incoming;
                     sf::Socket::Status status = socket.receive(incoming);
+
                     if (status == sf::Socket::Status::Disconnected) {
                         currentScreen = Screen::DISCONNECTED;
                     }
@@ -659,7 +706,7 @@ int main() {
                                         }
                                     }
 
-                                    /* sends the location of the sunk ship to the opponent in the form
+                                    /* sends the location of the sunk ship to the opponent in this form:
                                       message [shipSize] [row col] [row col] ... */
 
                                     revealSunkShip(socket, me, sunkShipPacket, sunkShip);
@@ -669,47 +716,23 @@ int main() {
                                 bool isHit;
                                 int rowHit, colHit;
                                 incoming >> isHit >> rowHit >> colHit;
-                                if (isHit) {
-                                    std::string attackCoordinate = std::string("Hit! ") + static_cast<char>(rowHit + 65)
-                                    + ":" + std::to_string(colHit);
-                                    gameUI.shipSunk.setString("");
-                                    gameUI.attackFeedback.setPosition({880.f, 400.f});
-                                    gameUI.attackFeedback.setString(attackCoordinate);
-                                    me.hitCount++;
-                                    me.trackingBoard[rowHit][colHit].setFillColor(sf::Color::Red);
-                                    me.cellAttacked[rowHit][colHit] = true;
-                                    storeMarker(me, rowHit, colHit, true);
-                                    if (playerWins(me)) {
-                                        gameUI.gameOver.setString("Game Over! " + me.myName + " won!");
-                                        currentScreen = Screen::GAME_OVER;
-                                        sf::Packet winDetected;
-                                        winDetected << MessageType::GAME_END;
-                                        socket.send(winDetected);
-                                    }
-                                }
-                                else if (!isHit) {
-                                    gameUI.attackFeedback.setPosition({880.f, 400.f});
-                                    std::string attackCoordinate = std::string("Miss! ") + static_cast<char>(rowHit + 65)
-                                    + ":" + std::to_string(colHit);
-                                    gameUI.shipSunk.setString("");
-                                    gameUI.attackFeedback.setString(attackCoordinate);
-                                    me.trackingBoard[rowHit][colHit].setFillColor(customWhite);
-                                    me.cellAttacked[rowHit][colHit] = true;
-                                    me.myTurn = false;
-                                }
+                                handleHitResult(&currentScreen, &socket, me, &gameUI, isHit, rowHit, colHit);
                             }
                             else if (message == MessageType::SUNK_SHIP) {
                             int count, row, col;
                             incoming >> count;
+                            gameUI.shipSunk.setString("Ship sunk!");
+                            gameUI.shipSunk.setPosition({880.f, 300.f});
+
+                            // marking the sunk ship on the player's tracking board with sunkShipColor
                             for (int i = 0; i < count; i++) {
                                 incoming >> row >> col;
                                 me.trackingBoard[row][col].setFillColor(sunkShipColor);
-                                gameUI.shipSunk.setString("Ship sunk!");
-                                gameUI.shipSunk.setPosition({880.f, 300.f});
                             }
                         }
+                            // if the game is over
                             else if (message == MessageType::GAME_END) {
-                                gameUI.gameOver.setString("Game Over! " + me.opponentName + " won!");
+                                gameUI.gameOverText.setString("Game Over! " + me.opponentName + " won!");
                                 currentScreen = Screen::GAME_OVER;
                             }
                         }
@@ -730,7 +753,7 @@ int main() {
             }
             else if (currentScreen == Screen::GAME_OVER) {
 
-                window.draw(gameUI.gameOver); window.draw(gameUI.playAgainButton);
+                window.draw(gameUI.gameOverText); window.draw(gameUI.playAgainButton);
                 window.draw(gameUI.rematchText); window.draw(gameUI.rematchAttemptText);
                 drawBoard(INITIAL_BOARD_OFFSET_X, me.board, 10, &gameUI);
 
@@ -749,7 +772,8 @@ int main() {
                             socket.send(playAgainPacket);
                         }
                     }
-                    else {
+                    else if (!gameUI.playAgainButton.getGlobalBounds().contains(mousePosition)
+                        && !me.playAgain) {
                         gameUI.playAgainButton.setFillColor(sf::Color::Red);
                     }
                     sf::Packet ready;
