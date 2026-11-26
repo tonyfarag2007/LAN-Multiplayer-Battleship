@@ -16,7 +16,7 @@ sf::RenderWindow window(sf::VideoMode({1920, 1080}),
     "Battleship", sf::Style::Titlebar | sf::Style::Close);
 sf::Font font("AsapSharp.ttf");
 sf::Color customWhite(255, 255, 255, 180);
-sf::Color shipGreen((0, 255, 0, 150)), shipRed((255, 0, 0, 150));
+sf::Color shipGreen(0, 255, 0, 150), shipRed(255, 0, 0, 150);
 sf::Color sunkShipColor(80, 75, 0, 255);
 class Ship {
 public:
@@ -554,7 +554,7 @@ int main() {
              }
             else if (currentScreen == PLACING_SHIPS) {
 
-                drawBoard(600.f, me.board, 10, &gameUI);
+                drawBoard(INITIAL_BOARD_OFFSET_X, me.board, 10, &gameUI);
                 buildUI(me, &gameUI);
 
                 if (placeShips(me)) {
@@ -754,7 +754,7 @@ int main() {
                 window.draw(gameUI.playAgainButton);
                 window.draw(gameUI.rematchText);
                 window.draw(gameUI.rematchAttemptText);
-                drawBoard(600.f, me.board, 10, &gameUI);
+                drawBoard(INITIAL_BOARD_OFFSET_X, me.board, 10, &gameUI);
 
                     for (int k = 0; k < 5; k++) {
                         me.shipShapes[k].setPosition({600.f + me.ships[k].col * 60.f,
