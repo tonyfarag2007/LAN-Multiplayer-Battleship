@@ -350,21 +350,21 @@ std::pair<int, int> attack(Player& player) {
     wasLeftDown = leftDown;
     return {rowHit, colHit};
 }
-bool handleOpponentAttack(Player& player, int rowHit, int colHit) {
-    bool hitFound = false;
+bool isHitFound(Player& player, int rowHit, int colHit) {
+    bool isHit = false;
    for (int i = 0; i < 5; i++) {
        for (int j = 0; j<player.ships[i].length; j++) {
            if (player.shipLocations[i][j].first == rowHit && player.shipLocations[i][j].second == colHit) {
                player.board[rowHit][colHit].setFillColor(sf::Color::White);
-               hitFound = true;
+               isHit = true;
                player.ships[i].cellsHit++;
            }
        }
    }
-    if (!hitFound) {
+    if (!isHit) {
         player.board[rowHit][colHit].setFillColor(customWhite);
     }
-    return hitFound;
+    return isHit;
 }
 
 // player wins on 15 hits (5 + 4 + 3 + 2 + 1)
@@ -374,18 +374,19 @@ bool playerWins(Player& player) {
 
 void handleHitResult(Screen *currentScreen, sf::TcpSocket *socket,
     Player& player, UI *ui, bool hitFound, int row, int col){
-
+    std::string attackCoordinate;
     player.cellAttacked[row][col] = true;
+    ui->attackFeedback.setPosition({880.f, 400.f});
+    ui->shipSunk.setString("");
 
     if (hitFound) {
         std::string attackCoordinate = std::string("Hit! ") + static_cast<char>(row + 65)
         + ":" + std::to_string(col);
-        ui->shipSunk.setString("");
-        ui->attackFeedback.setPosition({880.f, 400.f});
-        ui->attackFeedback.setString(attackCoordinate);
         player.hitCount++;
         player.trackingBoard[row][col].setFillColor(sf::Color::Red);
         storeMarker(player, row, col, true);
+
+        // win detector
         if (playerWins(player)) {
             ui->gameOverText.setString("Game Over! " + player.myName + " won!");
             *currentScreen = Screen::GAME_OVER;
@@ -393,17 +394,15 @@ void handleHitResult(Screen *currentScreen, sf::TcpSocket *socket,
             winDetected << MessageType::GAME_END;
             socket->send(winDetected);
         }
+
     }
     else if (!hitFound) {
-        ui->attackFeedback.setPosition({880.f, 400.f});
         std::string attackCoordinate = std::string("Miss! ") + static_cast<char>(row + 65)
         + ":" + std::to_string(col);
-        ui->shipSunk.setString("");
-        ui->attackFeedback.setString(attackCoordinate);
         player.trackingBoard[row][col].setFillColor(customWhite);
         player.myTurn = false;
     }
-
+    ui->attackFeedback.setString(attackCoordinate);
 }
 std::optional<std::vector<std::pair<int, int>>> handleSunkShip(Player& player) {
    for (int i = 0; i < 5; i++) {
@@ -676,7 +675,7 @@ int main() {
                                 int rowHit, colHit;
                                 incoming >> rowHit >> colHit;
                                 sf::Packet isHit;
-                                bool hitResult = handleOpponentAttack(me, rowHit, colHit);
+                                bool hitResult = isHitFound(me, rowHit, colHit);
                                 gameUI.shipSunk.setString("");
                                 gameUI.attackFeedback.setPosition({825.f, 400.f});
                                 if (hitResult) {
