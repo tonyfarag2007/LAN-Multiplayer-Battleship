@@ -82,7 +82,7 @@ bool isHanging(std::vector<std::vector<std::pair<int, int>>> playerShipLocations
     }
     return false;
 }
-bool placeShips(Player& player) {
+bool stillPlacing(Player& player) {
     auto mousePosition = sf::Vector2f(sf::Mouse::getPosition(window));
     static bool wasLeftDown = false, wasRightDown = false;
             bool leftDown = sf::Mouse::isButtonPressed(sf::Mouse::Button::Left), rightDown = sf::Mouse::isButtonPressed(sf::Mouse::Button::Right);
@@ -339,7 +339,7 @@ int main() {
                 lineOne.setPosition({600.f, 150.f + i * 60.f});
                 window.draw(lineOne);
             }
-            if (placeShips(me)) {
+            if (stillPlacing(me)) {
                 me.shipLocations = storeShipLocations(me.ships, 5);
                 if (!isOverlapping(me.shipLocations, me.ships, 5) && !isHanging(me.shipLocations, me.ships, 5)) {
                     window.draw(nextPlayer);
@@ -395,7 +395,7 @@ int main() {
             for (int i = 0; i < 5; i++) {
                 window.draw(playerTwo.shipShapes[i]);
             }
-            if (placeShips(playerTwo)) {
+            if (stillPlacing(playerTwo)) {
                 playerTwo.shipLocations = storeShipLocations(playerTwo.ships, 5);
                 if (!isOverlapping(playerTwo.shipLocations, playerTwo.ships, 5) && !isHanging(playerTwo.shipLocations, playerTwo.ships, 5)) {
                     window.draw(battleButton);

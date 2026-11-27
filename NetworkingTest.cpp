@@ -262,7 +262,7 @@ bool isHanging(std::vector<std::vector<std::pair<int, int>>>& locations,
     }
     return false;
 }
-bool placeShips(Player& player) {
+bool stillPlacing(Player& player) {
     if (player.isReady) return false;
     auto mousePosition = sf::Vector2f(sf::Mouse::getPosition(window));
     static bool wasLeftDown = false, wasRightDown = false;
@@ -308,8 +308,8 @@ bool placeShips(Player& player) {
                         if (insideBoard) {
                             player.ships[i].col = static_cast<int>((pos.x - INITIAL_BOARD_OFFSET_X) / CELL_LENGTH);
                             player.ships[i].row = static_cast<int>((pos.y - INITIAL_BOARD_OFFSET_Y) / CELL_LENGTH);
-                            player.shipShapes[i].setPosition({INITIAL_BOARD_OFFSET_X + player.ships[i].col * CELL_LENGTH,
-                                INITIAL_BOARD_OFFSET_Y + player.ships[i].row * CELL_LENGTH});
+                            player.shipShapes[i].setPosition({INITIAL_BOARD_OFFSET_X + static_cast<float>(player.ships[i].col) * CELL_LENGTH,
+                                INITIAL_BOARD_OFFSET_Y + static_cast<float>(player.ships[i].row) * CELL_LENGTH});
                             player.ships[i].isPlaced = true;
                         }
                     }
@@ -350,21 +350,45 @@ std::pair<int, int> attack(Player& player) {
     wasLeftDown = leftDown;
     return {rowHit, colHit};
 }
+
+// checks if a hit has been made, then updates the cell color accordingly
 bool isHitFound(Player& player, int rowHit, int colHit) {
     bool isHit = false;
-   for (int i = 0; i < 5; i++) {
-       for (int j = 0; j<player.ships[i].length; j++) {
-           if (player.shipLocations[i][j].first == rowHit && player.shipLocations[i][j].second == colHit) {
-               player.board[rowHit][colHit].setFillColor(sf::Color::White);
-               isHit = true;
-               player.ships[i].cellsHit++;
-           }
-       }
-   }
+    for (int i = 0; i < 5; i++) {
+        for (int j = 0; j<player.ships[i].length; j++) {
+            if (player.shipLocations[i][j].first == rowHit && player.shipLocations[i][j].second == colHit) {
+                player.board[rowHit][colHit].setFillColor(sf::Color::White);
+                isHit = true;
+                player.ships[i].cellsHit++;
+            }
+        }
+    }
     if (!isHit) {
         player.board[rowHit][colHit].setFillColor(customWhite);
     }
     return isHit;
+}
+
+void handleOpponentAttack(Player& player, sf::TcpSocket& socket, UI *ui, int rowHit, int colHit) {
+    std::string attackCoordinate;
+    sf::Packet hitFeedback;
+    bool hitResult = isHitFound(player, rowHit, colHit);
+    ui->shipSunk.setString("");
+    ui->attackFeedback.setPosition({825.f, 400.f});
+    if (hitResult) {
+        attackCoordinate = std::string("Opponent Attack: \n Hit! ") +
+            static_cast<char>(rowHit + 65) + ":" + std::to_string(colHit);
+        storeMarker(player, rowHit, colHit, false);
+        ui->attackFeedback.setString(attackCoordinate);
+    }
+    else if (!hitResult) {
+        attackCoordinate = std::string("Opponent Attack: \n Miss! ") +
+            static_cast<char>(rowHit + 65) + ":" + std::to_string(colHit);
+        ui->attackFeedback.setString(attackCoordinate);
+        player.myTurn = true;
+    }
+    hitFeedback << MessageType::HIT_RESULT << hitResult << rowHit << colHit;
+    socket.send(hitFeedback);
 }
 
 // player wins on 15 hits (5 + 4 + 3 + 2 + 1)
@@ -372,7 +396,7 @@ bool playerWins(Player& player) {
     return player.hitCount == 15;
 }
 
-void handleHitResult(Screen *currentScreen, sf::TcpSocket *socket,
+void handleHitFeedback(Screen *currentScreen, sf::TcpSocket *socket,
     Player& player, UI *ui, bool hitFound, int row, int col){
     std::string attackCoordinate;
     player.cellAttacked[row][col] = true;
@@ -380,7 +404,7 @@ void handleHitResult(Screen *currentScreen, sf::TcpSocket *socket,
     ui->shipSunk.setString("");
 
     if (hitFound) {
-        std::string attackCoordinate = std::string("Hit! ") + static_cast<char>(row + 65)
+        attackCoordinate = std::string("Hit! ") + static_cast<char>(row + 65)
         + ":" + std::to_string(col);
         player.hitCount++;
         player.trackingBoard[row][col].setFillColor(sf::Color::Red);
@@ -397,7 +421,7 @@ void handleHitResult(Screen *currentScreen, sf::TcpSocket *socket,
 
     }
     else if (!hitFound) {
-        std::string attackCoordinate = std::string("Miss! ") + static_cast<char>(row + 65)
+        attackCoordinate = std::string("Miss! ") + static_cast<char>(row + 65)
         + ":" + std::to_string(col);
         player.trackingBoard[row][col].setFillColor(customWhite);
         player.myTurn = false;
@@ -487,15 +511,16 @@ void buildGameplayUI(Player& player, UI *ui) {
     window.draw(ui->turnFeedback);
     window.draw(ui->shipSunk);
     for (int i = 0; i < 5; i++) {
-        player.shipShapes[i].setPosition({(INITIAL_BOARD_OFFSET_X + player.ships[i].col *
+        player.shipShapes[i].setPosition({(INITIAL_BOARD_OFFSET_X + static_cast<float>(player.ships[i].col) *
             CELL_LENGTH) - 440.f,
-            INITIAL_BOARD_OFFSET_Y + player.ships[i].row * CELL_LENGTH});
+            INITIAL_BOARD_OFFSET_Y + static_cast<float>(player.ships[i].row) * CELL_LENGTH});
         window.draw(player.shipShapes[i]);
     }
     drawMarkers(player.trackingHitMarkLocations); drawMarkers(player.hitMarkLocations);
 }
 
 int main() {
+    window.setFramerateLimit(60);
     Screen currentScreen = Screen::CONNECTING;
     char connectionType = 0;
     std::string hostIpInput;
@@ -590,7 +615,7 @@ int main() {
                 buildShipPlacementUI(me, &gameUI);
 
                 // ship placement and location storing logic
-                if (placeShips(me)) {
+                if (stillPlacing(me)) {
                     me.shipLocations = storeShipLocations(me.ships, 5);
                     if (!isOverlapping(me.shipLocations, me.ships, 5) &&
                         !isHanging(me.shipLocations, me.ships, 5)) {
@@ -670,28 +695,9 @@ int main() {
                             int message;
                             incoming >> message;
                             if (message == MessageType::ATTACK) {
-                                message = MessageType::HIT_RESULT;
-                                sf::Packet receivedAttack;
                                 int rowHit, colHit;
                                 incoming >> rowHit >> colHit;
-                                sf::Packet isHit;
-                                bool hitResult = isHitFound(me, rowHit, colHit);
-                                gameUI.shipSunk.setString("");
-                                gameUI.attackFeedback.setPosition({825.f, 400.f});
-                                if (hitResult) {
-                                    std::string attackCoordinate = std::string("Opponent Attack: \n Hit! ") +
-                                        static_cast<char>(rowHit + 65) + ":" + std::to_string(colHit);
-                                    storeMarker(me, rowHit, colHit, false);
-                                    gameUI.attackFeedback.setString(attackCoordinate);
-                                }
-                                else if (!hitResult) {
-                                    std::string attackCoordinate = std::string("Opponent Attack: \n Miss! ") +
-                                        static_cast<char>(rowHit + 65) + ":" + std::to_string(colHit);
-                                    gameUI.attackFeedback.setString(attackCoordinate);
-                                    me.myTurn = true;
-                                }
-                                isHit << message << hitResult << rowHit << colHit;
-                                socket.send(isHit);
+                                handleOpponentAttack(me, socket, &gameUI, rowHit, colHit);
                                 auto sunkShip = handleSunkShip(me);
                                 if (sunkShip.has_value()) {
                                     message = MessageType::SUNK_SHIP;
@@ -715,7 +721,7 @@ int main() {
                                 bool isHit;
                                 int rowHit, colHit;
                                 incoming >> isHit >> rowHit >> colHit;
-                                handleHitResult(&currentScreen, &socket, me, &gameUI, isHit, rowHit, colHit);
+                                handleHitFeedback(&currentScreen, &socket, me, &gameUI, isHit, rowHit, colHit);
                             }
                             else if (message == MessageType::SUNK_SHIP) {
                             int count, row, col;
@@ -757,8 +763,8 @@ int main() {
                 drawBoard(INITIAL_BOARD_OFFSET_X, me.board, 10, &gameUI);
 
                     for (int i = 0; i < 5;i++) {
-                        me.shipShapes[i].setPosition({INITIAL_BOARD_OFFSET_X + me.ships[i].col * CELL_LENGTH,
-                            INITIAL_BOARD_OFFSET_Y + me.ships[i].row * CELL_LENGTH});
+                        me.shipShapes[i].setPosition({INITIAL_BOARD_OFFSET_X + static_cast<float>(me.ships[i].col) * CELL_LENGTH,
+                            INITIAL_BOARD_OFFSET_Y + static_cast<float>(me.ships[i].row) * CELL_LENGTH});
                         window.draw(me.shipShapes[i]);
                     }
                     drawMarkers(me.gameOverHitMarkLocations);
